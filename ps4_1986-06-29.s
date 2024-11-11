@@ -1,6 +1,8 @@
 ;
 ; Annotated disassembly of Bubble Bobble's PS4 chip
 ;
+; https://github.com/luxocrates/bubbleBobblePs4Disasm
+;
 ; The PS4 (labeled JPH1011P, but referred to throughout official sources as PS4)
 ; is a 6801U4 microcontroller which serves as a security device for Bubble Bobble,
 ; without which the game is unplayable.
