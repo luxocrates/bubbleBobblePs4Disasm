@@ -117,8 +117,7 @@
 ;
 ; [$c24](rw) - Unknown (routine at $f2a7), parallel of [$c25]
 ; [$c25](rw) - Unknown (routine at $f347), parallel of [$c24]
-;
-; [$c26](rw) - Unknown (routine at $f3e3)
+; [$c26](rw) - Seems unused (an output for [$c7e] processor)
 ;
 ; -- Beastie output structure --------------------------------------------------
 ;
@@ -184,7 +183,7 @@
 ; [$c7c](rw) - Which EXTEND bubble the player would be offered if one appeared
 ;              right now
 ; [$c7d](w)  - I/O error reporting. PS4 writes $01 on error.
-; [$c7e](rw) - Unknown (routine at $f3e3)
+; [$c7e](rw) - Seems unused (causes writes to itself, [$c26] and $0054)
 ; [$c7f](r)  - Input for dead code at $f216-$f235. Maybe for debugging.
 ; [$c80](r)  - Unknown (routine at $f6f1)
 ; [$c81](w)  - Unknown (routine at $f6f1)
@@ -299,10 +298,20 @@
 ; $0058, $0059:  Input structure pointer for current beastie
 ; $005a, $005b:  Output structure pointer for current beastie
 ; $005c:         Beastie Y overlap accumulator
-; $005d:         Sequence index for the [$c72]->[$c73] creeper (seems unused)
-; $005e:         Sequence index for the [$c74]->[$c75] creeper (seems unused)
-; $005f:         Sequence index for the [$c76]->[$c77] creeper (wind speed)
-; $0060:         Sequence index for the [$c80]->[$c81] creeper (seems unused)
+; $005d:         Sequence index for the [$c72]->[$c73] creeper
+; $005e:         Sequence index for the [$c74]->[$c75] creeper
+; $005f:         Sequence index for the [$c76]->[$c77] creeper
+; $0060:         Sequence index for the [$c80]->[$c81] creeper
+;
+;
+; Handy reference for MAME debugging
+; ==================================
+;
+; To trap the main CPU attempting a write to [$c7e]:   wpset fc7e,1,w
+; To trap the main CPU attempting a read from [$c26]:  wpset fc26,1,r
+;
+; To trap the PS4 attempting a write to $0054          wpset 0054:mcu,1,w
+; To trap the PS4 attempting to execute $f070          bpset f070:mcu
 ;
 
 
@@ -365,7 +374,7 @@ F04C: BD F0 92 jsr  $F092                    ; Call PROCESS_CREDITS
 F04F: BD F1 B0 jsr  $F1B0                    ; Call PROCESS_COIN_LOCKOUTS
 F052: BD F2 A7 jsr  $F2A7
 F055: BD F3 47 jsr  $F347
-F058: BD F3 E3 jsr  $F3E3
+F058: BD F3 E3 jsr  $F3E3                    ; Call PROCESS_C7E
 F05B: BD F4 8F jsr  $F48F                    ; Call PROCESS_P1_BEASTIES
 F05E: BD F5 85 jsr  $F585                    ; Call PROCESS_P2_BEASTIES
 F061: BD F6 7F jsr  $F67F                    ; Call PROCESS_CREEPER_C72_C74
@@ -1037,30 +1046,52 @@ F3E2: 39       rts
 
 
 ;
-; A routine called from the main interrupt handler
+; PROCESS_C7E:
+; (Called from the main interrupt handler)
 ;
-; This one is dispatching multiple ways depending on the value of
-; [$c7e], which in my playthrough only ever reported zero.
+; Sets [$c26] and $0054 based on value of [$c7e]. Don't know what this was
+; intended for, as main CPU never attempts a write to [$c7e], nor a read from
+; [$c26] (outside of bootup RAM test).
+;
+; $0054 also seems to be uses in coin/credit processing.
+;
+;
+; Current [$c7e] value | New [$c26] and $0054 value | New [$c7e] value
+; ---------------------|----------------------------|-----------------
+;                  $01 |                        $00 |              $00
+;                  $02 |   incremented [$c26] value |              $00
+;                  $04 |                        $31 |              $00
+;                  $08 |                        $62 |              $00
+;                  $10 |                        $63 |              $00
+;                  $20 |                        $64 |              $00
+;                  $40 |                        $65 |              $00
+;                other |                  unchanged |        unchanged
+;
+; In the 'other' case, will crash if [$f95] if $42 and [$c26] doesn't match $0054
 ;
 
 F3E3: CE 0C 7E ldx  #$0C7E
 F3E6: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F3E9: C1 01    cmpb #$01
-F3EB: 27 2F    beq  $F41C
-F3ED: C1 02    cmpb #$02
-F3EF: 27 3F    beq  $F430
-F3F1: C1 04    cmpb #$04
-F3F3: 27 54    beq  $F449
-F3F5: C1 08    cmpb #$08
-F3F7: 27 66    beq  $F45F
-F3F9: C1 10    cmpb #$10
-F3FB: 27 6E    beq  $F46B
-F3FD: C1 20    cmpb #$20
-F3FF: 27 76    beq  $F477
-F401: C1 40    cmpb #$40
-F403: 27 7E    beq  $F483
+F3E9: C1 01    cmpb #$01                     ; If $01..
+F3EB: 27 2F    beq  $F41C                    ;       ..go to $f41c
+F3ED: C1 02    cmpb #$02                     ; If $02..
+F3EF: 27 3F    beq  $F430                    ;       ..go to $f430
+F3F1: C1 04    cmpb #$04                     ; If $04..
+F3F3: 27 54    beq  $F449                    ;       ..go to $f449
+F3F5: C1 08    cmpb #$08                     ; If $08..
+F3F7: 27 66    beq  $F45F                    ;       ..go to $f45f
+F3F9: C1 10    cmpb #$10                     ; If $10..
+F3FB: 27 6E    beq  $F46B                    ;       ..go to $f46b
+F3FD: C1 20    cmpb #$20                     ; If $20..
+F3FF: 27 76    beq  $F477                    ;       ..go to $f477
+F401: C1 40    cmpb #$40                     ; If $40..
+F403: 27 7E    beq  $F483                    ;       ..go to $f483
 
-; Reached only if [$c7e] was $00, $80, or not a power of two
+; Reached only if [$c7e] was $00, $80, or not a power of two:
+;
+; If [$f95] isn't $42, do no more
+; otherwise, read [$c26]. If it doesn't match $0054, trash the stack (why?!)
+;
 F405: CE 0F 95 ldx  #$0F95
 F408: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
 F40B: C1 42    cmpb #$42
@@ -1068,11 +1099,11 @@ F40D: 26 0C    bne  $F41B
 F40F: CE 0C 26 ldx  #$0C26
 F412: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
 F415: F1 00 54 cmpb $0054
-F418: 27 01    beq  $F41B                    ; This is odd.. 
-F41A: 36       psha                          ; ..we're conditionally pushing to the stack. Won't that screw the rts?
+F418: 27 01    beq  $F41B 
+F41A: 36       psha                          ; Puts a stray byte on the stack before an rts. Will crash.
 F41B: 39       rts  
 
-; Reached if [$c7e] was $01
+; [$c7e] was $01: clear what's at [$c26], $0054 and [$c7e]
 F41C: CE 0C 26 ldx  #$0C26
 F41F: C6 00    ldb  #$00
 F421: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
@@ -1082,7 +1113,7 @@ F42A: C6 00    ldb  #$00
 F42C: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 F42F: 39       rts  
 
-; Reached if [$c7e] was $02
+; [$c7e] was $02: increment what's at [$c26], caching new value at $0054; clear [$c7e]
 F430: CE 0C 26 ldx  #$0C26
 F433: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
 F436: 5C       incb 
@@ -1094,46 +1125,47 @@ F443: C6 00    ldb  #$00
 F445: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 F448: 39       rts  
 
-; Reached if [$c7e] was $04
+; [$c7e] was $04: write $31 to [$c26] and $0054, and $00 to [$c7e]
 F449: CE 0C 26 ldx  #$0C26
 F44C: C6 31    ldb  #$31
 F44E: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 F451: C6 31    ldb  #$31
+; Falls through...
 
 ; Common ending for this handler and the few that follow
-F453: F7 00 54 stb  $0054
-F456: CE 0C 7E ldx  #$0C7E
-F459: C6 00    ldb  #$00
+F453: F7 00 54 stb  $0054                    ; Cache the value we just wrote to shared RAM
+F456: CE 0C 7E ldx  #$0C7E                   ; To [$c7e], write..
+F459: C6 00    ldb  #$00                     ; ..zero
 F45B: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
-F45E: 39       rts  
+F45E: 39       rts                           ; Done
 
-; Reached if [$c7e] was $08
+; [$c7e] was $08: write $62 to [$c26] and $0054, and $00 to [$c7e]
 F45F: CE 0C 26 ldx  #$0C26
 F462: C6 62    ldb  #$62
 F464: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 F467: C6 62    ldb  #$62
-F469: 20 E8    bra  $F453
+F469: 20 E8    bra  $F453                    ; Common ending
 
-; Reached if [$c7e] was $10
+; [$c7e] was $10: write $63 to [$c26] and $0054, and $00 to [$c7e]
 F46B: CE 0C 26 ldx  #$0C26
 F46E: C6 63    ldb  #$63
 F470: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 F473: C6 63    ldb  #$63
-F475: 20 DC    bra  $F453
+F475: 20 DC    bra  $F453                    ; Common ending
 
-; Reached if [$c7e] was $20
+; [$c7e] was $20: write $64 to [$c26] and $0054, and $00 to [$c7e]
 F477: CE 0C 26 ldx  #$0C26
 F47A: C6 64    ldb  #$64
 F47C: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 F47F: C6 64    ldb  #$64
-F481: 20 D0    bra  $F453
+F481: 20 D0    bra  $F453                    ; Common ending
 
-; Reached if [$c7e] was $40
+; [$c7e] was $40: write $65 to [$c26] and $0054, and $00 to [$c7e]
 F483: CE 0C 26 ldx  #$0C26
 F486: C6 65    ldb  #$65
 F488: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 F48B: C6 65    ldb  #$65
-F48D: 20 C4    bra  $F453
+F48D: 20 C4    bra  $F453                    ; Common ending
 
 
 ;
@@ -2313,8 +2345,8 @@ F9AE: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
 
 
 ;
-; This is a table, accessed in $F914 and $F94E. It seems to point to other
-; tables. I don't yet know why.
+; This is a table, accessed in $f914, $f94e and $f988. It seems to point to
+; other tables. I don't yet know why.
 ;
 F9B1: F9 BB    .word $F9BB
 F9B3: FA BB    .word $FABB
