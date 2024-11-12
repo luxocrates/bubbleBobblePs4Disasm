@@ -1,7 +1,8 @@
 ;
 ; Annotated disassembly of Bubble Bobble's PS4 chip
 ;
-; https://github.com/luxocrates/bubbleBobblePs4Disasm
+; The latest version of this document can be found at:
+;     https://github.com/luxocrates/bubbleBobblePs4Disasm
 ;
 ; The PS4 (labeled JPH1011P, but referred to throughout official sources as PS4)
 ; is a 6801U4 microcontroller which serves as a security device for Bubble Bobble,
@@ -169,10 +170,10 @@
 ; [$c70](rw) - Parallel to [$c6f] (routine at $f347)
 
 ; [$c71](r)  - Unknown (routine at $f8d5) (credits prank?)
-; [$c72](r)  - Unknown (routine at $f67f) (always reads 0 in my experience)
-; [$c73](w)  - Unknown (routine at $f67f) (always writes 0 in my experience)
-; [$c74](r)  - Unknown (routine at $f67f) (always reads 0 in my experience)
-; [$c75](w)  - Unknown (routine at $f67f) (always writes 0 in my experience)
+; [$c72](r)  - Unknown (see PROCESS_C72_C74) (always reads 0 in my experience)
+; [$c73](w)  - Unknown (see PROCESS_C72_C74) (always writes 0 in my experience)
+; [$c74](r)  - Unknown (see PROCESS_C72_C74) (always reads 0 in my experience)
+; [$c75](w)  - Unknown (see PROCESS_C72_C74) (always writes 0 in my experience)
 ; [$c76](r)  - Wind speed
 ; [$c77](w)  - Seems to toggle rapidly between 0 and 1 in gameplay
 ; ------------------------------------------------------------------------------
@@ -299,7 +300,10 @@
 ; $0058, $0059:  Input structure pointer for current beastie
 ; $005a, $005b:  Output structure pointer for current beastie
 ; $005c:         Beastie Y overlap accumulator
+; $005d:         Unknown, see PROCESS_C72_C74
+; $005e:         Unknown, see PROCESS_C72_C74
 ; $005f:         Used in wind speed routine
+; $0060:         Unknown, see $f6f1
 ;
 
 
@@ -316,7 +320,7 @@ F00B: 86 FF    lda  #$FF
 F00D: 97 01    sta  $01                      ; Set port 2 data direction register
 F00F: 97 04    sta  $04                      ; Set port 3 data direction register
 F011: 97 05    sta  $05                      ; Set port 4 data direction register
-F013: 86 BF    lda  #$BF                     ; Store $b3..
+F013: 86 BF    lda  #$BF                     ; Store $bf..
 F015: 97 0F    sta  $0F                      ; ..into port 3 control and status register
 F017: 7F 00 08 clr  $0008                    ; Clear timer control and status register
 F01A: 7F 00 17 clr  $0017                    ; Clear timer control register 1
@@ -358,16 +362,16 @@ F045: 01       nop
 ;
 F046: BD F1 F8 jsr  $F1F8                    ; Call INTERRUPT_MAIN_CPU
 F049: BD F2 36 jsr  $F236                    ; Call RELAY_PORTS
-F04C: BD F0 92 jsr  $F092
+F04C: BD F0 92 jsr  $F092                    ; Call PROCESS_CREDITS
 F04F: BD F1 B0 jsr  $F1B0                    ; Call PROCESS_COIN_LOCKOUTS
 F052: BD F2 A7 jsr  $F2A7
 F055: BD F3 47 jsr  $F347
 F058: BD F3 E3 jsr  $F3E3
 F05B: BD F4 8F jsr  $F48F                    ; Call PROCESS_P1_BEASTIES
 F05E: BD F5 85 jsr  $F585                    ; Call PROCESS_P2_BEASTIES
-F061: BD F6 7F jsr  $F67F
-F064: BD F6 CB jsr  $F6CB
-F067: BD F6 F1 jsr  $F6F1
+F061: BD F6 7F jsr  $F67F                    ; Call PROCESS_C72_C74
+F064: BD F6 CB jsr  $F6CB                    ; (Something very similar)
+F067: BD F6 F1 jsr  $F6F1                    ; (Something very similar)
 F06A: BD F8 99 jsr  $F899                    ; Call PROCESS_CLOCK_ITEM
 F06D: BD F8 D5 jsr  $F8D5
 F070: BD F8 F1 jsr  $F8F1                    ; Call BUMP_EXTEND
@@ -387,6 +391,8 @@ F091: 3B       rti                           ; Done. Return to IDLE.
 
 
 ;
+; PROCESS_CREDITS:
+;
 ; A routine called from the main interrupt handler, and pointed to by the
 ; vector at $fff4 (output compare interrupt vector)
 ;
@@ -400,17 +406,18 @@ F098: C1 47    cmpb #$47
 F09A: 27 01    beq  $F09D
 F09C: 39       rts  
 
-; This seems to be configuring the I/O ports, then later goes on to do a whole
-; lot of stuff with the phony credit counter
+; Isolate the credit-related inputs from port 1
+;
 F09D: CE 00 40 ldx  #$0040                   ; X = $0040, for upcoming subroutine
 F0A0: 96 02    lda  $02                      ; Read port 1 (cabinet)
-F0A2: 48       asla                          ; Rotate until inputs TILT, SERVICE, COIN A, COIN B..
+F0A2: 48       asla                          ; Rotate until inputs COIN B, COIN A, SERVICE, TILT
 F0A3: 48       asla                          ; ..
 F0A4: 48       asla                          ; ..are in bits 7-4..
 F0A5: 48       asla                          ; ..and bits 3-0 are empty
 F0A6: C6 03    ldb  #$03                     ; Set loop counter to 3
 
-; Loop start
+; Loop: iterate through the three bits that have COIN B, COIN A and SERVICE
+; inputs
 F0A8: 36       psha 
 F0A9: 37       pshb 
 F0AA: BD F1 6F jsr  $F16F
@@ -418,7 +425,7 @@ F0AD: 33       pulb
 F0AE: 32       pula 
 F0AF: 48       asla 
 F0B0: 5A       decb 
-F0B1: 26 F5    bne  $F0A8
+F0B1: 26 F5    bne  $F0A8                    ; Loop to next most significant bit
 
 F0B3: B6 00 43 lda  $0043
 F0B6: 81 00    cmpa #$00
@@ -533,6 +540,9 @@ F16E: 39       rts
 
 ;
 ; Called during init, from $f0aa
+; On entry, X = $0040
+;           A = a byte where the MSB has a bit that, if low,
+;               should trigger a credit increment
 ;
 
 F16F: B7 00 46 sta  $0046                    ; Store cabinet inputs in addr $0046
@@ -646,6 +656,11 @@ F1D0: D7 07    stb  $07                      ; Put address low byte on port 4 (a
 F1D2: 97 03    sta  $03                      ; Put address high byte on port 2 (address bus upper)
 F1D4: 8A 10    ora  #$10                     ; Set /SORAM output bit (tells IC12 PAL of a request)
 F1D6: 97 03    sta  $03                      ; Add that to port 2
+
+; I'm guessing they've done some configuration of the ports to hold off read
+; attempts on port 3 data until the SC1 input is confident that the request has
+; been fulfilled, but I don't know where.
+;
 F1D8: D6 06    ldb  $06                      ; Read port 3 (data bus) data
 F1DA: 39       rts  
 
@@ -777,7 +792,7 @@ F277: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
 ; CHECKSUM:
 ;
 ; Calculates a 16-bit checksum of code ROM, for the main CPU to use in a self-
-; test. The game code expects the value reported here to be $0000; it it isn't,
+; test. The game code expects the value reported here to be $0000; if it isn't,
 ; it'll display 'PS4 SUM ERROR' and do a boot loop.
 ;
 
@@ -791,10 +806,10 @@ F282: 08       inx                           ; ..twice (we're doing 16-bit words
 F283: 8C 00 00 cmpx #$0000                   ; Looped through all of ROM?
 F286: 26 F7    bne  $F27F                    ; If not, iterate
 
-F288: 36       psha                          ; Save A (one byte of the checksum)
+F288: 36       psha                          ; Stash A (one byte of the checksum)
 F289: CE 0C 83 ldx  #$0C83                   ; Store the other byte to [$c83]
 F28C: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
-F28F: 33       pulb                          ; Retrieve stored A
+F28F: 33       pulb                          ; Retrieve stashed A
 F290: CE 0C 82 ldx  #$0C82                   ; Store it in [$c82]
 F293: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 F296: 39       rts  
@@ -1329,7 +1344,7 @@ F566: 27 FA    beq  $F562                    ; If not, early-out
 ;
 F568: CE 0C 5F ldx  #$0C5F                   ; Re-load player phony liveness
 F56B: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F56E: C4 01    andb #$01                     ; Echoing what happened at $F4C6..
+F56E: C4 01    andb #$01                     ; Echoing what happened at $f4c6..
 F570: C1 01    cmpb #$01                     ; ..
 F572: 26 EE    bne  $F562                    ; Early-out if player seems dead (never happens)
 
@@ -1483,97 +1498,132 @@ F67C: 7E F1 DB jmp  $F1DB                    ; (see routine at $f48f)
 
 
 ;
+; PROCESS_C72_C74:
+;
 ; A routine called from the main interrupt handler
+;
+; Absolutely no clue what this is for. In abstract, it's feeding [$c73] and
+; [$c75] based on the current values of [$c72] and [$c74], and the current
+; values of addresses $005d and $005e -- and using lots of tables in doing so.
+;
+; So far, I've only ever seen [$c72] and [$c74] be $00. And $005d and $005e
+; aren't exercised outside of this routine (ignoring RAM initialization), so
+; this is a closed system, and unless the CPU ever feeds something to
+; [$c72]/[$c74], I don't think we have a way of guessing its purpose.
+;
+; Potentially instructive is that the primary table it uses is used elsewhere.
 ;
 
 F67F: CE 0C 72 ldx  #$0C72
 F682: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F685: CE F7 17 ldx  #$F717                   ; Point X to primary table base
+F688: 3A       abx                           ; Add whatever [$c72] was..
+F689: 3A       abx                           ; ..twice, as table entries are 16-bit
+F68A: EE 00    ldx  $00,x                    ; 2-byte table lookup into X
 
-; This is a table lookup
-F685: CE F7 17 ldx  #$F717
-F688: 3A       abx  
-F689: 3A       abx  
-F68A: EE 00    ldx  $00,x
-F68C: F6 00 5D ldb  $005D
-F68F: 3A       abx  
-F690: A6 00    lda  $00,x
-F692: 81 FF    cmpa #$FF
-F694: 26 05    bne  $F69B
-F696: 7F 00 5D clr  $005D
-F699: 20 E4    bra  $F67F
-F69B: 7C 00 5D inc  $005D
-F69E: 16       tab  
-F69F: CE 0C 73 ldx  #$0C73
+; X is now the base pointer for another table
+F68C: F6 00 5D ldb  $005D                    ; Use contents of $005d..
+F68F: 3A       abx                           ; ..as secondary table index
+F690: A6 00    lda  $00,x                    ; 1-byte table lookup into A 
+F692: 81 FF    cmpa #$FF                     ; Was table entry $ff?
+F694: 26 05    bne  $F69B                    ; If not, continue
+F696: 7F 00 5D clr  $005D                    ; If so, clear (whatever $005d is)
+F699: 20 E4    bra  $F67F                    ; Loop to start of this handler
+
+F69B: 7C 00 5D inc  $005D                    ; Increment (whatever $005d is)
+F69E: 16       tab                           ; Transfer to B..
+F69F: CE 0C 73 ldx  #$0C73                   ; ..for storage at [$c73]
 F6A2: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
-F6A5: CE 0C 74 ldx  #$0C74
+
+;
+; Now, do with [$c74] and $005e exactly what we just did with [$c72] and $005d
+;
+
+F6A5: CE 0C 74 ldx  #$0C74                   ; Fetch [$c74]
 F6A8: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F6AB: CE F7 17 ldx  #$F717
-F6AE: 3A       abx  
-F6AF: 3A       abx  
-F6B0: EE 00    ldx  $00,x
-F6B2: F6 00 5E ldb  $005E
-F6B5: 3A       abx  
-F6B6: A6 00    lda  $00,x
-F6B8: 81 FF    cmpa #$FF
-F6BA: 26 05    bne  $F6C1
-F6BC: 7F 00 5E clr  $005E
-F6BF: 20 E4    bra  $F6A5
-F6C1: 7C 00 5E inc  $005E
-F6C4: 16       tab  
-F6C5: CE 0C 75 ldx  #$0C75
+F6AB: CE F7 17 ldx  #$F717                   ; Point X to that original table base
+F6AE: 3A       abx                           ; Add the index..
+F6AF: 3A       abx                           ; ..as 2-byte entries
+F6B0: EE 00    ldx  $00,x                    ; Load the secondary table pointer to X
+
+; X is now the base pointer for another table
+F6B2: F6 00 5E ldb  $005E                    ; Use contents of $005e..
+F6B5: 3A       abx                           ; ..as secondary table index
+F6B6: A6 00    lda  $00,x                    ; 1-byte table lookup into A 
+F6B8: 81 FF    cmpa #$FF                     ; Was table entry $ff?
+F6BA: 26 05    bne  $F6C1                    ; If not, continue
+F6BC: 7F 00 5E clr  $005E                    ; If so, clear (whatever $005e is)
+F6BF: 20 E4    bra  $F6A5                    ; And re-run the primary table lookup code
+
+F6C1: 7C 00 5E inc  $005E                    ; Increment (whatever $005d is)
+F6C4: 16       tab                           ; Transfer to B..
+F6C5: CE 0C 75 ldx  #$0C75                   ; ..for storage at [$c75]
 F6C8: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
 
 
 ;
 ; A routine called from the main interrupt handler
 ;
+; Identical to $f6a5-$f6c8, but with:
+;   Input  [$c76] instead of [$c74]
+;   Output [$c77] instead of [$c75]
+;   Memory $005f  instead of $005e
+;
+; What's special about this one, however, is that we do see its input changing
+; in-game. [$c76] seems to relate to the current wind speed.
+;
 ; I wonder if this is toggling [$c77] at a speed related to the wind speed
 ;
 
-F6CB: CE 0C 76 ldx  #$0C76                   ; [$c76] is the wind speed value
-F6CE: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F6D1: CE F7 17 ldx  #$F717                   ; Point X to table base
-F6D4: 3A       abx                           ; X += B
-F6D5: 3A       abx                           ; X += B
-F6D6: EE 00    ldx  $00,x                    ; Load table value into X
-F6D8: F6 00 5F ldb  $005F
-F6DB: 3A       abx                           ; X += B
-F6DC: A6 00    lda  $00,x                    ; Looks like the table was a table of tables!
-F6DE: 81 FF    cmpa #$FF
-F6E0: 26 05    bne  $F6E7
-F6E2: 7F 00 5F clr  $005F
-F6E5: 20 E4    bra  $F6CB                    ; Loop to start of this routine
-
-F6E7: 7C 00 5F inc  $005F
-F6EA: 16       tab  
-F6EB: CE 0C 77 ldx  #$0C77
-F6EE: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
+F6CB: CE 0C 76 ldx  #$0C76                   ; (See routine at $f6a5)
+F6CE: BD F1 BF jsr  $F1BF                    ; (See routine at $f6a5)
+F6D1: CE F7 17 ldx  #$F717                   ; (See routine at $f6a5)
+F6D4: 3A       abx                           ; (See routine at $f6a5)
+F6D5: 3A       abx                           ; (See routine at $f6a5)
+F6D6: EE 00    ldx  $00,x                    ; (See routine at $f6a5)
+F6D8: F6 00 5F ldb  $005F                    ; (See routine at $f6a5)
+F6DB: 3A       abx                           ; (See routine at $f6a5)
+F6DC: A6 00    lda  $00,x                    ; (See routine at $f6a5)
+F6DE: 81 FF    cmpa #$FF                     ; (See routine at $f6a5)
+F6E0: 26 05    bne  $F6E7                    ; (See routine at $f6a5)
+F6E2: 7F 00 5F clr  $005F                    ; (See routine at $f6a5)
+F6E5: 20 E4    bra  $F6CB                    ; (See routine at $f6a5)
+F6E7: 7C 00 5F inc  $005F                    ; (See routine at $f6a5)
+F6EA: 16       tab                           ; (See routine at $f6a5)
+F6EB: CE 0C 77 ldx  #$0C77                   ; (See routine at $f6a5)
+F6EE: 7E F1 DB jmp  $F1DB                    ; (See routine at $f6a5)
 
 
 ;
 ; A routine called from the main interrupt handler
 ;
+; Identical to $f6a5-$f6c8, but with:
+;   Input  [$c80] instead of [$c74]
+;   Output [$c81] instead of [$c75]
+;   Memory $0060  instead of $005e
+;
 
-F6F1: CE 0C 80 ldx  #$0C80
-F6F4: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F6F7: CE F7 17 ldx  #$F717
-F6FA: 3A       abx  
-F6FB: 3A       abx  
-F6FC: EE 00    ldx  $00,x
-F6FE: F6 00 60 ldb  $0060
-F701: 3A       abx  
-F702: A6 00    lda  $00,x
-F704: 81 FF    cmpa #$FF
-F706: 26 05    bne  $F70D
-F708: 7F 00 60 clr  $0060
-F70B: 20 E4    bra  $F6F1
-F70D: 7C 00 60 inc  $0060
-F710: 16       tab  
-F711: CE 0C 81 ldx  #$0C81
-F714: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
+F6F1: CE 0C 80 ldx  #$0C80                   ; (See routine at $f6a5)
+F6F4: BD F1 BF jsr  $F1BF                    ; (See routine at $f6a5)
+F6F7: CE F7 17 ldx  #$F717                   ; (See routine at $f6a5)
+F6FA: 3A       abx                           ; (See routine at $f6a5)
+F6FB: 3A       abx                           ; (See routine at $f6a5)
+F6FC: EE 00    ldx  $00,x                    ; (See routine at $f6a5)
+F6FE: F6 00 60 ldb  $0060                    ; (See routine at $f6a5)
+F701: 3A       abx                           ; (See routine at $f6a5)
+F702: A6 00    lda  $00,x                    ; (See routine at $f6a5)
+F704: 81 FF    cmpa #$FF                     ; (See routine at $f6a5)
+F706: 26 05    bne  $F70D                    ; (See routine at $f6a5)
+F708: 7F 00 60 clr  $0060                    ; (See routine at $f6a5)
+F70B: 20 E4    bra  $F6F1                    ; (See routine at $f6a5)
+F70D: 7C 00 60 inc  $0060                    ; (See routine at $f6a5)
+F710: 16       tab                           ; (See routine at $f6a5)
+F711: CE 0C 81 ldx  #$0C81                   ; (See routine at $f6a5)
+F714: 7E F1 DB jmp  $F1DB                    ; (See routine at $f6a5)
 
 
-; A table for code at $f685
+; A table for code at PROCESS_C72_C74, as well as the routines that start at
+; $f6cb/$f6f7. 
 
 F717: F7 69    .word $F769
 F719: F7 6B    .word $F76B
@@ -1617,7 +1667,8 @@ F763: F8 7C    .word $F87C
 F765: F8 82    .word $F882
 F767: F8 8D    .word $F88D
 
-; I think there might now follow a whole sequence of tables with one-byte values, not .word's
+; There now follow a whole sequence of tables with one-byte values, not .word's.
+; TODO: change the layout
 
 F769: 00 FF    .word $00FF
 F76B: 01 00    .word $0100
@@ -2640,89 +2691,103 @@ FEBF: 86 AF    lda  #$AF
 FEC1: 97 0F    sta  $0F
 
 ; Initialize timers, serial port
-FEC3: 7F 00 08 clr  $0008
-FEC6: 7F 00 17 clr  $0017
-FEC9: 7F 00 18 clr  $0018
-FECC: 7F 00 11 clr  $0011
-FECF: 7F 00 19 clr  $0019
+FEC3: 7F 00 08 clr  $0008                    ; Reset timer control and status register
+FEC6: 7F 00 17 clr  $0017                    ; Reset timer control register 1
+FEC9: 7F 00 18 clr  $0018                    ; Reset timer control register 2
+FECC: 7F 00 11 clr  $0011                    ; Reset transmit/receive control and status register
+FECF: 7F 00 19 clr  $0019                    ; Reset timer status register
 FED2: CC 00 A0 ldd  #$00A0
-FED5: DD 0B    std  $0B
+FED5: DD 0B    std  $0B                      ; Output compare register (high byte)
 FED7: CC 00 00 ldd  #$0000
-FEDA: DD 1A    std  $1A
+FEDA: DD 1A    std  $1A                      ; Output compare register 2 (high byte)
 FEDC: CC 20 00 ldd  #$2000
-FEDF: DD 1C    std  $1C
+FEDF: DD 1C    std  $1C                      ; Output compare register 3 (high byte)
 FEE1: 86 AA    lda  #$AA
 FEE3: 16       tab  
-FEE4: 91 02    cmpa $02
+FEE4: 91 02    cmpa $02                      ; Port 1 data register
 FEE6: 26 55    bne  $FF3D
-FEE8: 91 07    cmpa $07
+FEE8: 91 07    cmpa $07                      ; Port 4 data register
 FEEA: 26 51    bne  $FF3D
-FEEC: 96 03    lda  $03
+FEEC: 96 03    lda  $03                      ; Port 2 data register
 FEEE: 84 1F    anda #$1F
 FEF0: 81 0A    cmpa #$0A
 FEF2: 26 49    bne  $FF3D
 FEF4: 17       tba  
-FEF5: 91 06    cmpa $06
+FEF5: 91 06    cmpa $06                      ; Port 3 data register
 FEF7: 26 44    bne  $FF3D
 FEF9: 86 55    lda  #$55
 FEFB: 16       tab  
-FEFC: 91 02    cmpa $02
+FEFC: 91 02    cmpa $02                      ; Port 1 data register
 FEFE: 26 3D    bne  $FF3D
-FF00: 91 07    cmpa $07
+FF00: 91 07    cmpa $07                      ; Port 4 data register
 FF02: 26 39    bne  $FF3D
-FF04: 96 03    lda  $03
+FF04: 96 03    lda  $03                      ; Port 2 data register
 FF06: 84 1F    anda #$1F
 FF08: 81 15    cmpa #$15
 FF0A: 26 31    bne  $FF3D
 FF0C: 17       tba  
-FF0D: 91 06    cmpa $06
+FF0D: 91 06    cmpa $06                      ; Port 3 data register
 FF0F: 26 2C    bne  $FF3D
 FF11: 86 FF    lda  #$FF
-FF13: 97 00    sta  $00
-FF15: 97 01    sta  $01
-FF17: 97 04    sta  $04
-FF19: 97 05    sta  $05
+FF13: 97 00    sta  $00                      ; Port 1 data direction register
+FF15: 97 01    sta  $01                      ; Port 2 data direction register
+FF17: 97 04    sta  $04                      ; Port 3 data direction register
+FF19: 97 05    sta  $05                      ; Port 4 data direction register
+
 FF1B: 86 BF    lda  #$BF
-FF1D: 97 0F    sta  $0F
+FF1D: 97 0F    sta  $0F                      ; Port 3 control and status register
+
 FF1F: 86 0F    lda  #$0F
-FF21: 97 02    sta  $02
-FF23: 97 03    sta  $03
-FF25: 97 07    sta  $07
-FF27: 97 06    sta  $06
-FF29: 96 19    lda  $19
+FF21: 97 02    sta  $02                      ; Port 1 data register
+FF23: 97 03    sta  $03                      ; Port 2 data register
+FF25: 97 07    sta  $07                      ; Port 4 data register
+FF27: 97 06    sta  $06                      ; Port 3 data register
+
+; Loop
+FF29: 96 19    lda  $19                      ; Timer status register
 FF2B: 84 08    anda #$08
 FF2D: 26 02    bne  $FF31
-FF2F: 20 F8    bra  $FF29
+FF2F: 20 F8    bra  $FF29                    ; Loop
+
 FF31: 86 F0    lda  #$F0
-FF33: 97 02    sta  $02
-FF35: 97 03    sta  $03
-FF37: 97 07    sta  $07
-FF39: 97 06    sta  $06
+FF33: 97 02    sta  $02                      ; Port 1 data register
+FF35: 97 03    sta  $03                      ; Port 2 data register
+FF37: 97 07    sta  $07                      ; Port 4 data register
+FF39: 97 06    sta  $06                      ; Port 3 data register
 FF3B: 20 03    bra  $FF40
-FF3D: 7E F0 03 jmp  $F003
+
+;
+; This is the success point, where we can return to the main setup
+;
+FF3D: 7E F0 03 jmp  $F003                    ; Return to boot sequence at $f003
 FF40: 86 00    lda  #$00
 FF42: 16       tab  
 FF43: CE 00 40 ldx  #$0040
 FF46: 3A       abx  
+
+; Loop
 FF47: C6 A5    ldb  #$A5
 FF49: E7 00    stb  $00,x
 FF4B: 08       inx  
 FF4C: 8C 01 00 cmpx #$0100
-FF4F: 27 16    beq  $FF67
+FF4F: 27 16    beq  $FF67                    ; Continue
 FF51: C6 5A    ldb  #$5A
 FF53: E7 00    stb  $00,x
 FF55: 08       inx  
 FF56: 8C 01 00 cmpx #$0100
-FF59: 27 0C    beq  $FF67
+FF59: 27 0C    beq  $FF67                    ; Continue
 FF5B: C6 00    ldb  #$00
 FF5D: E7 00    stb  $00,x
 FF5F: 08       inx  
 FF60: 8C 01 00 cmpx #$0100
-FF63: 27 02    beq  $FF67
-FF65: 20 E0    bra  $FF47
+FF63: 27 02    beq  $FF67                    ; Continue
+FF65: 20 E0    bra  $FF47                    ; Loop
+
 FF67: 16       tab  
 FF68: CE 00 40 ldx  #$0040
 FF6B: 3A       abx  
+
+; Loop
 FF6C: C6 A5    ldb  #$A5
 FF6E: E1 00    cmpb $00,x
 FF70: 26 6B    bne  $FFDD
@@ -2741,25 +2806,29 @@ FF88: 26 53    bne  $FFDD
 FF8A: 08       inx  
 FF8B: 8C 01 00 cmpx #$0100
 FF8E: 27 04    beq  $FF94
-FF90: D6 19    ldb  $19
-FF92: 20 D8    bra  $FF6C
-FF94: D6 19    ldb  $19
+FF90: D6 19    ldb  $19                      ; Timer status register
+FF92: 20 D8    bra  $FF6C                    ; Loop
+
+FF94: D6 19    ldb  $19                      ; Timer status register
 FF96: CE 00 00 ldx  #$0000
-FF99: DF 1A    stx  $1A
+FF99: DF 1A    stx  $1A                      ; Output compare register 2 (high byte)
 FF9B: CE 20 00 ldx  #$2000
-FF9E: DF 1C    stx  $1C
+FF9E: DF 1C    stx  $1C                      ; Output compare register 3 (high byte)
 FFA0: 4C       inca 
 FFA1: 81 03    cmpa #$03
 FFA3: 26 9D    bne  $FF42
-FFA5: 96 19    lda  $19
+
+; Loop
+FFA5: 96 19    lda  $19                      ; Timer status register
 FFA7: 84 10    anda #$10
 FFA9: 26 02    bne  $FFAD
 FFAB: 20 F8    bra  $FFA5
+
 FFAD: 86 AA    lda  #$AA
-FFAF: 97 02    sta  $02
-FFB1: 97 03    sta  $03
-FFB3: 97 07    sta  $07
-FFB5: 97 06    sta  $06
+FFAF: 97 02    sta  $02                      ; Port 1 data register
+FFB1: 97 03    sta  $03                      ; Port 2 data register
+FFB3: 97 07    sta  $07                      ; Port 4 data register
+FFB5: 97 06    sta  $06                      ; Port 3 data register
 FFB7: CE F0 00 ldx  #$F000
 FFBA: 4F       clra 
 FFBB: 5F       clrb 
@@ -2772,15 +2841,18 @@ FFC5: 4D       tsta
 FFC6: 26 15    bne  $FFDD
 FFC8: 5D       tstb 
 FFC9: 26 12    bne  $FFDD
-FFCB: 96 19    lda  $19
+
+; Loop
+FFCB: 96 19    lda  $19                      ; Timer status register
 FFCD: 84 20    anda #$20
 FFCF: 26 02    bne  $FFD3
 FFD1: 20 F8    bra  $FFCB
+
 FFD3: 86 55    lda  #$55
-FFD5: 97 02    sta  $02
-FFD7: 97 03    sta  $03
-FFD9: 97 07    sta  $07
-FFDB: 97 06    sta  $06
+FFD5: 97 02    sta  $02                      ; Port 1 data register
+FFD7: 97 03    sta  $03                      ; Port 2 data register
+FFD9: 97 07    sta  $07                      ; Port 4 data register
+FFDB: 97 06    sta  $06                      ; Port 3 data register
 FFDD: 20 FE    bra  $FFDD                    ; loop forever
 
 
