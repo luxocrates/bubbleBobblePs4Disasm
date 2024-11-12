@@ -102,8 +102,17 @@
 ;
 ; ------------------------------------------------------------------------------
 ;
-; [$c1e](r)  - Phony credit counter
-;              (Independently-tracked credit count; not used by main CPU)
+; [$c1e](rw) - Phony credits count
+;
+; It seems likely that this value was intended to be the authoritative credits
+; count, but got deprecated, with vestiges of it remaining.
+;
+; The main CPU tracks the credits count itself, using only the relay of port 1
+; at [$c1f] to increment it. After incrementing, however, it does update the
+; the shared value at [$c1e], but it's not clear why: this seems to be the
+; only time the CPU updates the value -- it doesn't decrement it on game start.
+; Separately, the main CPU communicates to the PS4 using [$f94] whether the
+; coin lockouts should be enabled or not.
 ;
 ; -- Relayed input ports -------------------------------------------------------
 ;
@@ -284,6 +293,11 @@
 ; RAM
 ; ---
 ; $0043:         Unknown (used at $f0b3)
+; $0048:         Phony unactioned coins count
+;                (An unactioned coin is where the game pricing would be, say,
+;                2-coins-1-credit: after receiving the first coin, this is the
+;                counter we bump). But the whole credits count is phony: the
+;                main CPU doesn't use any of it.
 ; $004a, $004b:  Scratch (last shared RAM address read from or written to.)
 ; 0004c, $004d:  (Used only by dead code at $f216-$f235)
 ; $004e:         Cached controls/DIPs byte 0
@@ -384,7 +398,7 @@ F045: 01       nop
 ;
 F046: BD F1 F8 jsr  $F1F8                    ; Call INTERRUPT_MAIN_CPU
 F049: BD F2 36 jsr  $F236                    ; Call RELAY_PORTS
-F04C: BD F0 92 jsr  $F092                    ; Call PROCESS_CREDITS
+F04C: BD F0 92 jsr  $F092                    ; Call PROCESS_PHONY_CREDITS
 F04F: BD F1 B0 jsr  $F1B0                    ; Call PROCESS_COIN_LOCKOUTS
 F052: BD F2 A7 jsr  $F2A7                    ; Call PROCESS_C6F
 F055: BD F3 47 jsr  $F347                    ; Call PROCESS_C70
@@ -413,15 +427,16 @@ F091: 3B       rti                           ; Done: return to IDLE
 
 
 ;
-; PROCESS_CREDITS:
+; PROCESS_PHONY_CREDITS:
+; (Called from the main interrupt handler, and the output compare interrupt
+; vector, $fff4)
 ;
-; A routine called from the main interrupt handler, and pointed to by the
-; vector at $fff4 (output compare interrupt vector)
-;
-; This part reads [$f98], and returns if it doesn't get the $47 magic number
-; there that it expects. (See also $f1f8)
+; This routine tries to track the credits count, but the main CPU ignores all of
+; its output
 ;
 
+; Check that the main CPU is ready for us (see also $f1f8)
+;
 F092: CE 0F 98 ldx  #$0F98
 F095: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
 F098: C1 47    cmpb #$47
@@ -432,14 +447,16 @@ F09C: 39       rts
 ;
 F09D: CE 00 40 ldx  #$0040                   ; X = $0040, for upcoming subroutine
 F0A0: 96 02    lda  $02                      ; Read port 1 (cabinet)
-F0A2: 48       asla                          ; Rotate until inputs COIN B, COIN A, SERVICE, TILT
-F0A3: 48       asla                          ; ..
+F0A2: 48       asla                          ; Rotate until inputs COIN B, ..
+F0A3: 48       asla                          ; ..COIN A, SERVICE, TILT..
 F0A4: 48       asla                          ; ..are in bits 7-4..
 F0A5: 48       asla                          ; ..and bits 3-0 are empty
 F0A6: C6 03    ldb  #$03                     ; Set loop counter to 3
 
 ; Loop: iterate through the three bits that have COIN B, COIN A and SERVICE
-; inputs
+; inputs. This looks like it's calling a routine that processes the MSB, then
+; shifts to get the next one into the MSB, until it's done them all.
+;
 F0A8: 36       psha 
 F0A9: 37       pshb 
 F0AA: BD F1 6F jsr  $F16F
@@ -449,40 +466,59 @@ F0AF: 48       asla
 F0B0: 5A       decb 
 F0B1: 26 F5    bne  $F0A8                    ; Loop to next most significant bit
 
-F0B3: B6 00 43 lda  $0043
-F0B6: 81 00    cmpa #$00
-F0B8: 26 39    bne  $F0F3
+F0B3: B6 00 43 lda  $0043                    ; Guessing this is a sum of coin inputs?
+F0B6: 81 00    cmpa #$00                     ; Did anything come in?
+F0B8: 26 39    bne  $F0F3                    ; If not, skip to part 2
+
+; This part is only reached if there's an incoming credit
+;
+; But I don't (yet) understand how it handles the case when multiple coin inputs
+; fire at once. That _should_ award multiple times. Do we loop back here
+; somewhere?
+;
 F0BA: F6 00 4E ldb  $004E                    
 F0BD: 54       lsrb 
 F0BE: 54       lsrb 
 F0BF: 54       lsrb 
 
-; I'm seeing this getting reached the moment a coin's inserted. I suspect we're
-; looking up the coins/credits table...
+; Look up the coins/credits table
 ;
 F0C0: C4 06    andb #$06
-F0C2: CE F1 87 ldx  #$F187                   ; data table pointer
-F0C5: 3A       abx  
-F0C6: A6 00    lda  $00,x
-F0C8: 81 01    cmpa #$01
-F0CA: 27 0D    beq  $F0D9
-F0CC: 7C 00 48 inc  $0048
-F0CF: A6 00    lda  $00,x
-F0D1: B1 00 48 cmpa $0048
-F0D4: 26 1D    bne  $F0F3
-F0D6: 7F 00 48 clr  $0048
-F0D9: A6 01    lda  $01,x
-F0DB: 36       psha 
-F0DC: CE 0C 1E ldx  #$0C1E
+F0C2: CE F1 87 ldx  #$F187                   ; Point X to PHONY_COINS_PER_CREDIT_TABLE
+F0C5: 3A       abx                           ; Add index
+F0C6: A6 00    lda  $00,x                    ; Load the coins value from the table
+F0C8: 81 01    cmpa #$01                     ; A 1-coin entry?
+F0CA: 27 0D    beq  $F0D9                    ; If so, skip to $f0d9
+
+; (Multiple) coins, (some number of) credits
+;
+F0CC: 7C 00 48 inc  $0048                    ; Bump the phony unactioned coins count
+F0CF: A6 00    lda  $00,x                    ; Refetch the coins value table entry (redundant?)
+F0D1: B1 00 48 cmpa $0048                    ; Have we received enough coins?
+F0D4: 26 1D    bne  $F0F3                    ; If not, skip to part 2
+F0D6: 7F 00 48 clr  $0048                    ; If so, reset the phony count
+
+; We've received enough coins to grant credits
+;
+F0D9: A6 01    lda  $01,x                    ; Load the credits value from the table
+F0DB: 36       psha                          ; Stash it
+F0DC: CE 0C 1E ldx  #$0C1E                   ; Read phony credits count
 F0DF: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F0E2: 32       pula 
-F0E3: 1B       aba  
-F0E4: 16       tab  
-F0E5: CE 0C 1E ldx  #$0C1E
+F0E2: 32       pula                          ; Retrieve stashed credits value
+F0E3: 1B       aba                           ; Add to the phony credits count
+F0E4: 16       tab                           ; Move it to B, so we can..
+F0E5: CE 0C 1E ldx  #$0C1E                   ; ..store the phony credits count
 F0E8: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
-F0EB: CE 0F 99 ldx  #$0F99                   ; Into phony credit event channel..
+
+; Trigger the credit-inserted event on the phony credit event channel
+;
+F0EB: CE 0F 99 ldx  #$0F99                   ; Into [$f99]..
 F0EE: C6 01    ldb  #$01                     ; ..write $01 (a credit bump happened)
 F0F0: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+
+;
+; Part 2 of the coin procesing
+;
 F0F3: B6 00 41 lda  $0041
 F0F6: 81 00    cmpa #$00
 F0F8: 26 3B    bne  $F135
@@ -515,6 +551,10 @@ F12A: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 F12D: CE 0F 99 ldx  #$0F99                   ; Into phony credit event channel..
 F130: C6 01    ldb  #$01                     ; ..write $01 (a credit bump happened)
 F132: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+
+;
+; Part 3 - reconsider the coin lockouts?
+;
 F135: B6 00 45 lda  $0045
 F138: 81 00    cmpa #$00
 F13A: 26 1A    bne  $F156
@@ -561,7 +601,8 @@ F16C: 97 02    sta  $02                      ; Write it to port 1
 F16E: 39       rts  
 
 ;
-; Called during init, from $f0aa
+; A subroutine for PROCESS_PHONY_CREDITS
+;
 ; On entry, X = $0040
 ;           A = a byte where the MSB has a bit that, if low,
 ;               should trigger a credit increment
@@ -583,21 +624,20 @@ F184: 08       inx
 F185: 08       inx  
 F186: 39       rts  
 
+
 ;
-; A table, accessed from $f0c2 and $f104. But in both cases, before the table
-; is derefernced, the index is ANDed with 6, meaning every other byte is
-; unreachable. Why?
+; PHONY_COINS_PER_CREDIT_TABLE:
 ;
-; My guess is this relates to the x coins/y credits DIP switch settings
+; I can't quite explain the ordering here: it doesn't seem to match the DIPs.
+; Although this isn't the _real_ table: the main CPU completely ignores the
+; credits-counting work that the PS4 is doing. Maybe they changed it the
+; assignments?
 ;
-F187: 02       .byte $02
-F188: 01       .byte $01
-F189: 02       .byte $02
-F18A: 03       .byte $03
-F18B: 01       .byte $01
-F18C: 02       .byte $02
-F18D: 01       .byte $01
-F18E: 01       .byte $01
+
+F187: 02 01    .byte $02,$01                 ; 2 coins 1 credit
+F189: 02 03    .byte $02,$03                 ; 2 coins 3 credits
+F18B: 01 02    .byte $01,$02                 ; 1 coin  2 credits
+F18D: 01 01    .byte $01,$01                 ; 1 coin  1 credit
 
 
 ;
