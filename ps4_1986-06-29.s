@@ -184,7 +184,7 @@
 ;              right now
 ; [$c7d](w)  - I/O error reporting. PS4 writes $01 on error.
 ; [$c7e](rw) - Seems unused (causes writes to itself, [$c26] and $0054)
-; [$c7f](r)  - Input for dead code at $f216-$f235. Maybe for debugging.
+; [$c7f](r)  - Seems unused (input for dead code at $f216-$f235)
 ; [$c80](r)  - Unknown (routine at $f6f1)
 ; [$c81](w)  - Unknown (routine at $f6f1)
 ; [$c82](w)  - PS4 checksum high byte (game will report error if nonzero)
@@ -372,8 +372,8 @@ F046: BD F1 F8 jsr  $F1F8                    ; Call INTERRUPT_MAIN_CPU
 F049: BD F2 36 jsr  $F236                    ; Call RELAY_PORTS
 F04C: BD F0 92 jsr  $F092                    ; Call PROCESS_CREDITS
 F04F: BD F1 B0 jsr  $F1B0                    ; Call PROCESS_COIN_LOCKOUTS
-F052: BD F2 A7 jsr  $F2A7
-F055: BD F3 47 jsr  $F347
+F052: BD F2 A7 jsr  $F2A7                    ; Call PROCESS_C6F
+F055: BD F3 47 jsr  $F347                    ; Call PROCESS_C70
 F058: BD F3 E3 jsr  $F3E3                    ; Call PROCESS_C7E
 F05B: BD F4 8F jsr  $F48F                    ; Call PROCESS_P1_BEASTIES
 F05E: BD F5 85 jsr  $F585                    ; Call PROCESS_P2_BEASTIES
@@ -383,19 +383,19 @@ F067: BD F6 F1 jsr  $F6F1                    ; Call PROCESS_CREEPER_C80
 F06A: BD F8 99 jsr  $F899                    ; Call PROCESS_CLOCK_ITEM
 F06D: BD F8 D5 jsr  $F8D5
 F070: BD F8 F1 jsr  $F8F1                    ; Call BUMP_EXTEND
-F073: BD F9 03 jsr  $F903
-F076: BD F9 3D jsr  $F93D
-F079: BD F9 77 jsr  $F977
+F073: BD F9 03 jsr  $F903                    ; Call PROCESS_F88
+F076: BD F9 3D jsr  $F93D                    ; Call PROCESS_F8C
+F079: BD F9 77 jsr  $F977                    ; Call PROCESS_F90
 F07C: BD F2 99 jsr  $F299                    ; Call LISTEN_FOR_RESET
 
 F07F: CE 0F 96 ldx  #$0F96                   ; Read [$f96]
 F082: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F085: C1 47    cmpb #$47                     ; If 71..
+F085: C1 47    cmpb #$47                     ; If $47..
 F087: 27 08    beq  $F091                    ;      ..skip the cycle burn
 F089: CC 01 70 ldd  #$0170                   ; Burn cycles: iterate through $170 (368) empty loops
-F08C: 83 00 01 subd #$0001
-F08F: 26 FB    bne  $F08C
-F091: 3B       rti                           ; Done. Return to IDLE.
+F08C: 83 00 01 subd #$0001                   ; Decrement loop counter
+F08F: 26 FB    bne  $F08C                    ; Loop
+F091: 3B       rti                           ; Done: return to IDLE
 
 
 ;
@@ -849,15 +849,16 @@ F2A6: 39       rts
 
 
 ;
-; A routine called from the main interrupt handler
+; PROCESS_C6F:
+; (Called from the main interrupt handler)
 ;
-; Does work depending on value of [$c6f].  I don't know what that's for: in
+; Does work depending on value of [$c6f]. I don't know what that's for: in
 ; practice, I've only ever seen it report zero.
 ;
 ; Mirrored in $f347, with different constants
 ;
 
-F2A7: CE 0C 6F ldx  #$0C6F                   ; We'll be reading [$c70]
+F2A7: CE 0C 6F ldx  #$0C6F                   ; We'll be reading [$c6f]
 F2AA: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
 F2AD: C1 01    cmpb #$01                     ; If $01..
 F2AF: 27 23    beq  $F2D4                    ;       ..jump to $f2d4
@@ -952,7 +953,8 @@ F346: 02       .byte $02
 
 
 ;
-; A routine called from the main interrupt handler
+; PROCESS_C70:
+; (Called from the main interrupt handler)
 ;
 ; Appears to parallel the routine at $f2a7, but for [$c70] instead of [$c6f]
 ;
@@ -2241,7 +2243,8 @@ F900: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
 
 
 ;
-; A routine called from the main interrupt handler
+; PROCESS_F88:
+; (Called from the main interrupt handler)
 ;
 
 ; Return immediately if value of [$f88] isn't 1
@@ -2277,7 +2280,9 @@ F93A: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
 
 
 ;
-; A routine called from the main interrupt handler
+; PROCESS_F8C:
+; (Called from the main interrupt handler)
+;
 ; Looks like a second copy of $f903, with different constants
 ;
 
@@ -2311,7 +2316,9 @@ F974: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
 
 
 ;
-; A routine called from the main interrupt handler
+; PROCESS_F90:
+; (Called from the main interrupt handler)
+;
 ; Looks like a third copy of $f903, with different constants
 ;
 
