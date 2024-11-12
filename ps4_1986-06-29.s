@@ -396,6 +396,7 @@ F045: 01       nop
 ;
 ; The entrypoint for per-frame processing of basically everything the PS4 does
 ;
+
 F046: BD F1 F8 jsr  $F1F8                    ; Call INTERRUPT_MAIN_CPU
 F049: BD F2 36 jsr  $F236                    ; Call RELAY_PORTS
 F04C: BD F0 92 jsr  $F092                    ; Call PROCESS_PHONY_CREDITS
@@ -409,7 +410,7 @@ F061: BD F6 7F jsr  $F67F                    ; Call PROCESS_CREEPER_C72_C74
 F064: BD F6 CB jsr  $F6CB                    ; Call PROCESS_CREEPER_C76
 F067: BD F6 F1 jsr  $F6F1                    ; Call PROCESS_CREEPER_C80
 F06A: BD F8 99 jsr  $F899                    ; Call PROCESS_CLOCK_ITEM
-F06D: BD F8 D5 jsr  $F8D5
+F06D: BD F8 D5 jsr  $F8D5                    ; Call PROCESS_CREDITS_MISCHIEF
 F070: BD F8 F1 jsr  $F8F1                    ; Call BUMP_EXTEND
 F073: BD F9 03 jsr  $F903                    ; Call PROCESS_F88
 F076: BD F9 3D jsr  $F93D                    ; Call PROCESS_F8C
@@ -876,10 +877,10 @@ F290: CE 0C 82 ldx  #$0C82                   ; Store it in [$c82]
 F293: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 F296: 39       rts  
 ;
-; Given that there are exactly 2 bytes between CHECKSUM and the following
-; routine, and that the checksum is a 2-byte value, and that nothing tries
-; jumping to either of them, I think it's a safe bet that these are the checksum
-; balancing bytes: the values needed to force the sum to be zero.
+; Given that the checksum is a 2-byte value, and that there are exactly 2 bytes
+; between CHECKSUM and the following routine, neither of which get jumped to, I
+; think it's a safe bet that these are the checksum balancing bytes: the values
+; needed to force the sum to be zero.
 ;
 F297: 08 38    .byte $08,$38
 
@@ -2243,20 +2244,14 @@ F8D2: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
 
 
 ;
-; A routine called from the main interrupt handler
+; PROCESS_CREDITS_MISCHIEF:
+; (Called from the main interrupt handler)
 ;
-; If I'm understanding this correctly, it's inserting 42 credits on some weird
-; eventuality.
+; Sets the phony credits count to 42 if [$c71] is $0d, and $0054 is $0c
 ;
-; But although [$c1e] seems to hold the remaining credits, the CPU doesn't seem
-; to act on it. It has its own counter, which [$c1e] kinda mirrors, but changing
-; [$c1e] seems to have no effect. So maybe they meant for the MCU to track
-; credits, but then abandoned that work and had the CPU do it.
-;
-; I suspect this writing 42 to it might have been an act of sabotage, like to
-; make the machine spontaneously award free credits if it suspects its integrity
-; is compromised. It's certainly the kind of number that could be used in a
-; prank...
+; I suspect this might be an attempt at sabotage, like to make the machine
+; spontaneously award free credits if it suspects its integrity is compromised.
+; It's certainly the kind of number that could be used in a prank...
 ;
 ; How would it work though? Perhaps if you had a real PS4, but the main CPU's
 ; ROM checksum doesn't check out or something? Hard to imagine.
@@ -2266,15 +2261,15 @@ F8D5: CE 0C 71 ldx  #$0C71                   ; Read [$c71]
 F8D8: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
 F8DB: C1 0D    cmpb #$0D                     ; If $0d..
 F8DD: 27 01    beq  $F8E0                    ;       ..skip the return
-F8DF: 39       rts                           ; Return
+F8DF: 39       rts                           ; Early-out
 
-F8E0: F6 00 54 ldb  $0054
-F8E3: C1 0C    cmpb #$0C
-F8E5: 27 01    beq  $F8E8
-F8E7: 39       rts  
+F8E0: F6 00 54 ldb  $0054                    ; Read $0054
+F8E3: C1 0C    cmpb #$0C                     ; If $0c..
+F8E5: 27 01    beq  $F8E8                    ;       ..skip the return
+F8E7: 39       rts                           ; Early-out
 
-F8E8: CE 0C 1E ldx  #$0C1E                   ; I think this one's the phony credit counter
-F8EB: C6 2A    ldb  #$2A                     ; ($2a is 42)
+F8E8: CE 0C 1E ldx  #$0C1E                   ; Into the phony credits count..
+F8EB: C6 2A    ldb  #$2A                     ; ..write $2a (42)
 F8ED: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 F8F0: 39       rts  
 
