@@ -226,7 +226,8 @@
 ; [$f96](r)  - Delay after interrupt handler, if $47
 ; [$f97](r)  - Reboot PS4, if $4a
 ; [$f98](r)  - Generate main CPU interrupts, if $47
-; [$f99](w)  - Coin/credit related, but CPU doesn't seem affected if suppressed
+; [$f99](w)  - Phony credit event: PS4 writes $01 here on credit bump, but
+;              main CPU doesn't read it
 ;
 ;
 ; Memory map
@@ -307,11 +308,24 @@
 ; Handy reference for MAME debugging
 ; ==================================
 ;
-; To trap the main CPU attempting a write to [$c7e]:   wpset fc7e,1,w
-; To trap the main CPU attempting a read from [$c26]:  wpset fc26,1,r
+; To set [$c10] to $3f:                      fill fc10,1,3f
 ;
-; To trap the PS4 attempting a write to $0054          wpset 0054:mcu,1,w
-; To trap the PS4 attempting to execute $f070          bpset f070:mcu
+; To trap the main CPU writing to [$c7e]:    wpset fc7e,1,w
+; To trap the main CPU reading from [$c26]:  wpset fc26,1,r
+;
+; To trap the PS4 writing to $0054:          wpset 0054:mcu,1,w
+; To trap the PS4 executing $f070:           bpset f070:mcu
+; To trap* the PS4 reading from [$c7c]:      bpset f1bf:mcu,x==c7c
+; To trap* the PS4 reading $05 from [$c7c]:  bpset f1da:mcu,x==c7c && b==05
+; To trap* the PS4 writing to [$f99]:        bpset f1db:mcu,x==f99
+; To trap* the PS4 writing $7c to [$f99]:    bpset f1db:mcu,x==f99 && b==7c
+;
+; *: the PS4 doesn't directly wire to shared RAM, so we can't trap accesses
+; using basic debugger functionality. As a workaround, we can put a breakpoint
+; on the two functions that interface with it, and set a condition on the target
+; address. This will leave the PS4's PC at the interfacing code, and the
+; instruction that initiated it on the top of the stack. Use the `out` debugger
+; command to advance execution back to the routine that initiated it.
 ;
 
 
@@ -466,8 +480,8 @@ F0E3: 1B       aba
 F0E4: 16       tab  
 F0E5: CE 0C 1E ldx  #$0C1E
 F0E8: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
-F0EB: CE 0F 99 ldx  #$0F99
-F0EE: C6 01    ldb  #$01
+F0EB: CE 0F 99 ldx  #$0F99                   ; Into phony credit event channel..
+F0EE: C6 01    ldb  #$01                     ; ..write $01 (a credit bump happened)
 F0F0: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 F0F3: B6 00 41 lda  $0041
 F0F6: 81 00    cmpa #$00
@@ -498,8 +512,8 @@ F125: 1B       aba
 F126: 16       tab  
 F127: CE 0C 1E ldx  #$0C1E
 F12A: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
-F12D: CE 0F 99 ldx  #$0F99
-F130: C6 01    ldb  #$01
+F12D: CE 0F 99 ldx  #$0F99                   ; Into phony credit event channel..
+F130: C6 01    ldb  #$01                     ; ..write $01 (a credit bump happened)
 F132: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 F135: B6 00 45 lda  $0045
 F138: 81 00    cmpa #$00
@@ -512,8 +526,8 @@ F145: 25 1A    bcs  $F161                    ; If carry, do ENABLE_COIN_LOCKOUTS
 F147: 5C       incb 
 F148: CE 0C 1E ldx  #$0C1E
 F14B: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
-F14E: CE 0F 99 ldx  #$0F99
-F151: C6 01    ldb  #$01
+F14E: CE 0F 99 ldx  #$0F99                   ; Into phony credit event channel..
+F151: C6 01    ldb  #$01                     ; ..write $01 (a credit bump happened)
 F153: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 F156: CE 0C 1E ldx  #$0C1E
 F159: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
@@ -657,8 +671,8 @@ F1C5: 7F 00 04 clr  $0004
 
 ; Put out the address with /SORAM low. Then set /SORAM high to kick off the request
 ;
-F1C8: FF 00 4A stx  $004A                    ; Stash shared RAM address in $004a
-F1CB: FC 00 4A ldd  $004A                    ; Maybe just to move X to A and B?
+F1C8: FF 00 4A stx  $004A                    ; Stash shared RAM address in $004a..
+F1CB: FC 00 4A ldd  $004A                    ; ..maybe just to move X to A and B?
 F1CE: 84 0F    anda #$0F                     ; Mask out upper nibble of address
 F1D0: D7 07    stb  $07                      ; Put address low byte on port 4 (address bus lower)
 F1D2: 97 03    sta  $03                      ; Put address high byte on port 2 (address bus upper)
