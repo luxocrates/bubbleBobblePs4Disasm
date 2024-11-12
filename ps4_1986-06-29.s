@@ -19,7 +19,7 @@
 ;   - rotating which EXTEND bubbles the players are given
 ;   - effecting functionality for the clock special item
 ;   - generating interrupts on the main CPU
-;   - ...and likely more (how does wind speed factor in, for example?)
+;   - ...and possibly more
 ;
 ; Suffice it to say, one does not _need_ a microcontroller to do any of the above.
 ; The PS4's real purpose is to move some vital functionality behind an opaque
@@ -33,8 +33,7 @@
 ; of mask ROM and 192 bytes of RAM. If you're not familiar with 6800/6801
 ; assembly (I wasn't), be aware that:
 ;
-; - Registers A and B can be used together as a 16-bit register, in which case 
-;   they're called D.
+; - Registers A and B can be used together as a 16-bit pair, called D.
 ; - Like 68k, immediate addressing is denoted with '#', and absolute addressing
 ;   has no denotation at all. It's very easy to see an instruction like
 ;   `ora $47` and think it's ORing with a constant, when in fact the argument is
@@ -170,12 +169,12 @@
 ; [$c70](rw) - Parallel to [$c6f] (routine at $f347)
 
 ; [$c71](r)  - Unknown (routine at $f8d5) (credits prank?)
-; [$c72](r)  - Unknown (see PROCESS_C72_C74) (always reads 0 in my experience)
-; [$c73](w)  - Unknown (see PROCESS_C72_C74) (always writes 0 in my experience)
-; [$c74](r)  - Unknown (see PROCESS_C72_C74) (always reads 0 in my experience)
-; [$c75](w)  - Unknown (see PROCESS_C72_C74) (always writes 0 in my experience)
-; [$c76](r)  - Wind speed
-; [$c77](w)  - Seems to toggle rapidly between 0 and 1 in gameplay
+; [$c72](r)  - Seems unused (feeds creeper for [$c73])
+; [$c73](w)  - Seems unused (fed from creeper for [$c72])
+; [$c74](r)  - Seems unused (feeds creeper for [$c75])
+; [$c75](w)  - Seems unused (fed from creeper for [$c74])
+; [$c76](r)  - Wind speed   (feeds creeper for [$c77])
+; [$c77](w)  - Seems unused (fed from creeper for [$c76])
 ; ------------------------------------------------------------------------------
 ; [$c78](rw) - Clock downcounter low byte
 ; [$c79](rw) - Clock downcounter high byte
@@ -294,16 +293,16 @@
 ; $0052:         Unknown, see $f2e7 et al
 ; $0053:         Parallel of $0052
 ; $0054:         Unknown (credits related?)
-; $0055:         Current player Y position
-; $0056:         Current player X position
+; $0055:         Cached player Y position
+; $0056:         Cached player X position
 ; $0057:         Number of beastie currently being processed
 ; $0058, $0059:  Input structure pointer for current beastie
 ; $005a, $005b:  Output structure pointer for current beastie
 ; $005c:         Beastie Y overlap accumulator
-; $005d:         Unknown, see PROCESS_C72_C74
-; $005e:         Unknown, see PROCESS_C72_C74
-; $005f:         Used in wind speed routine
-; $0060:         Unknown, see $f6f1
+; $005d:         Sequence index for the [$c72]->[$c73] creeper (seems unused)
+; $005e:         Sequence index for the [$c74]->[$c75] creeper (seems unused)
+; $005f:         Sequence index for the [$c76]->[$c77] creeper (wind speed)
+; $0060:         Sequence index for the [$c80]->[$c81] creeper (seems unused)
 ;
 
 
@@ -311,9 +310,9 @@
 ; Code!
 
 ; Cold start entrypoint
-F000: 7E FE BB jmp  $FEBB
-F003: 8E 00 FF lds  #$00FF                   ; Set stack pointer
-F006: 0F       sei                           ; Disable interrupts
+F000: 7E FE BB jmp  $FEBB                    ; Jump to CONFIGURE_MCU
+F003: 8E 00 FF lds  #$00FF                   ; Set stack pointer (already done)
+F006: 0F       sei                           ; Disable interrupts (already done)
 F007: 86 F0    lda  #$F0
 F009: 97 00    sta  $00                      ; Set port 1 data direction register
 F00B: 86 FF    lda  #$FF
@@ -369,9 +368,9 @@ F055: BD F3 47 jsr  $F347
 F058: BD F3 E3 jsr  $F3E3
 F05B: BD F4 8F jsr  $F48F                    ; Call PROCESS_P1_BEASTIES
 F05E: BD F5 85 jsr  $F585                    ; Call PROCESS_P2_BEASTIES
-F061: BD F6 7F jsr  $F67F                    ; Call PROCESS_C72_C74
-F064: BD F6 CB jsr  $F6CB                    ; (Something very similar)
-F067: BD F6 F1 jsr  $F6F1                    ; (Something very similar)
+F061: BD F6 7F jsr  $F67F                    ; Call PROCESS_CREEPER_C72_C74
+F064: BD F6 CB jsr  $F6CB                    ; Call PROCESS_CREEPER_C76
+F067: BD F6 F1 jsr  $F6F1                    ; Call PROCESS_CREEPER_C80
 F06A: BD F8 99 jsr  $F899                    ; Call PROCESS_CLOCK_ITEM
 F06D: BD F8 D5 jsr  $F8D5
 F070: BD F8 F1 jsr  $F8F1                    ; Call BUMP_EXTEND
@@ -1498,330 +1497,620 @@ F67C: 7E F1 DB jmp  $F1DB                    ; (see routine at $f48f)
 
 
 ;
-; PROCESS_C72_C74:
+; PROCESS_CREEPER_C72_C74:
+; (Called from the main interrupt handler)
 ;
-; A routine called from the main interrupt handler
-;
-; Absolutely no clue what this is for. In abstract, it's feeding [$c73] and
-; [$c75] based on the current values of [$c72] and [$c74], and the current
-; values of addresses $005d and $005e -- and using lots of tables in doing so.
-;
-; So far, I've only ever seen [$c72] and [$c74] be $00. And $005d and $005e
-; aren't exercised outside of this routine (ignoring RAM initialization), so
-; this is a closed system, and unless the CPU ever feeds something to
-; [$c72]/[$c74], I don't think we have a way of guessing its purpose.
-;
-; Potentially instructive is that the primary table it uses is used elsewhere.
+; Two creepers (see PROCESS_CREEPER_C76) chained together. The first uses:
+;   - table source [$c72]
+;   - output value [$c73]
+;   - sequence index at $005d
 ;
 
-F67F: CE 0C 72 ldx  #$0C72
-F682: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F685: CE F7 17 ldx  #$F717                   ; Point X to primary table base
-F688: 3A       abx                           ; Add whatever [$c72] was..
-F689: 3A       abx                           ; ..twice, as table entries are 16-bit
-F68A: EE 00    ldx  $00,x                    ; 2-byte table lookup into X
-
-; X is now the base pointer for another table
-F68C: F6 00 5D ldb  $005D                    ; Use contents of $005d..
-F68F: 3A       abx                           ; ..as secondary table index
-F690: A6 00    lda  $00,x                    ; 1-byte table lookup into A 
-F692: 81 FF    cmpa #$FF                     ; Was table entry $ff?
-F694: 26 05    bne  $F69B                    ; If not, continue
-F696: 7F 00 5D clr  $005D                    ; If so, clear (whatever $005d is)
-F699: 20 E4    bra  $F67F                    ; Loop to start of this handler
-
-F69B: 7C 00 5D inc  $005D                    ; Increment (whatever $005d is)
-F69E: 16       tab                           ; Transfer to B..
-F69F: CE 0C 73 ldx  #$0C73                   ; ..for storage at [$c73]
-F6A2: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
-
+F67F: CE 0C 72 ldx  #$0C72                   ; (See routine at $f6cb)
+F682: BD F1 BF jsr  $F1BF                    ; (See routine at $f6cb)
+F685: CE F7 17 ldx  #$F717                   ; (See routine at $f6cb)
+F688: 3A       abx                           ; (See routine at $f6cb)
+F689: 3A       abx                           ; (See routine at $f6cb)
+F68A: EE 00    ldx  $00,x                    ; (See routine at $f6cb)
+F68C: F6 00 5D ldb  $005D                    ; (See routine at $f6cb)
+F68F: 3A       abx                           ; (See routine at $f6cb)
+F690: A6 00    lda  $00,x                    ; (See routine at $f6cb)
+F692: 81 FF    cmpa #$FF                     ; (See routine at $f6cb)
+F694: 26 05    bne  $F69B                    ; (See routine at $f6cb)
+F696: 7F 00 5D clr  $005D                    ; (See routine at $f6cb)
+F699: 20 E4    bra  $F67F                    ; (See routine at $f6cb)
+F69B: 7C 00 5D inc  $005D                    ; (See routine at $f6cb)
+F69E: 16       tab                           ; (See routine at $f6cb)
+F69F: CE 0C 73 ldx  #$0C73                   ; (See routine at $f6cb)
+F6A2: BD F1 DB jsr  $F1DB                    ; jsr instead of jmp, to fall through
 ;
-; Now, do with [$c74] and $005e exactly what we just did with [$c72] and $005d
+; This second creeper uses:
+;   - table source [$c74]
+;   - output value [$c75]
+;   - sequence index at $005e
 ;
-
-F6A5: CE 0C 74 ldx  #$0C74                   ; Fetch [$c74]
-F6A8: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F6AB: CE F7 17 ldx  #$F717                   ; Point X to that original table base
-F6AE: 3A       abx                           ; Add the index..
-F6AF: 3A       abx                           ; ..as 2-byte entries
-F6B0: EE 00    ldx  $00,x                    ; Load the secondary table pointer to X
-
-; X is now the base pointer for another table
-F6B2: F6 00 5E ldb  $005E                    ; Use contents of $005e..
-F6B5: 3A       abx                           ; ..as secondary table index
-F6B6: A6 00    lda  $00,x                    ; 1-byte table lookup into A 
-F6B8: 81 FF    cmpa #$FF                     ; Was table entry $ff?
-F6BA: 26 05    bne  $F6C1                    ; If not, continue
-F6BC: 7F 00 5E clr  $005E                    ; If so, clear (whatever $005e is)
-F6BF: 20 E4    bra  $F6A5                    ; And re-run the primary table lookup code
-
-F6C1: 7C 00 5E inc  $005E                    ; Increment (whatever $005d is)
-F6C4: 16       tab                           ; Transfer to B..
-F6C5: CE 0C 75 ldx  #$0C75                   ; ..for storage at [$c75]
-F6C8: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
+F6A5: CE 0C 74 ldx  #$0C74                   ; (See routine at $f6cb)
+F6A8: BD F1 BF jsr  $F1BF                    ; (See routine at $f6cb)
+F6AB: CE F7 17 ldx  #$F717                   ; (See routine at $f6cb)
+F6AE: 3A       abx                           ; (See routine at $f6cb)
+F6AF: 3A       abx                           ; (See routine at $f6cb)
+F6B0: EE 00    ldx  $00,x                    ; (See routine at $f6cb)
+F6B2: F6 00 5E ldb  $005E                    ; (See routine at $f6cb)
+F6B5: 3A       abx                           ; (See routine at $f6cb)
+F6B6: A6 00    lda  $00,x                    ; (See routine at $f6cb)
+F6B8: 81 FF    cmpa #$FF                     ; (See routine at $f6cb)
+F6BA: 26 05    bne  $F6C1                    ; (See routine at $f6cb)
+F6BC: 7F 00 5E clr  $005E                    ; (See routine at $f6cb)
+F6BF: 20 E4    bra  $F6A5                    ; (See routine at $f6cb)
+F6C1: 7C 00 5E inc  $005E                    ; (See routine at $f6cb)
+F6C4: 16       tab                           ; (See routine at $f6cb)
+F6C5: CE 0C 75 ldx  #$0C75                   ; (See routine at $f6cb)
+F6C8: 7E F1 DB jmp  $F1DB                    ; (See routine at $f6cb)
 
 
 ;
-; A routine called from the main interrupt handler
+; PROCESS_CREEPER_C76:
+; (Called from the main interrupt handler)
 ;
-; Identical to $f6a5-$f6c8, but with:
-;   Input  [$c76] instead of [$c74]
-;   Output [$c77] instead of [$c75]
-;   Memory $005f  instead of $005e
+; A creeper using:
+;   - table source [$c76]
+;   - output value [$c77]
+;   - sequence index at $005f
 ;
-; What's special about this one, however, is that we do see its input changing
-; in-game. [$c76] seems to relate to the current wind speed.
+; 'Creepers' are routines that emit a sequence of integers contrived to average
+; out at a very specific fraction. The values would be used to determine how many
+; times, in any given frame, to perform some unit of work, such that a steady
+; non-integer rate of work can be achieved on average.
 ;
-; I wonder if this is toggling [$c77] at a speed related to the wind speed
-;
-
-F6CB: CE 0C 76 ldx  #$0C76                   ; (See routine at $f6a5)
-F6CE: BD F1 BF jsr  $F1BF                    ; (See routine at $f6a5)
-F6D1: CE F7 17 ldx  #$F717                   ; (See routine at $f6a5)
-F6D4: 3A       abx                           ; (See routine at $f6a5)
-F6D5: 3A       abx                           ; (See routine at $f6a5)
-F6D6: EE 00    ldx  $00,x                    ; (See routine at $f6a5)
-F6D8: F6 00 5F ldb  $005F                    ; (See routine at $f6a5)
-F6DB: 3A       abx                           ; (See routine at $f6a5)
-F6DC: A6 00    lda  $00,x                    ; (See routine at $f6a5)
-F6DE: 81 FF    cmpa #$FF                     ; (See routine at $f6a5)
-F6E0: 26 05    bne  $F6E7                    ; (See routine at $f6a5)
-F6E2: 7F 00 5F clr  $005F                    ; (See routine at $f6a5)
-F6E5: 20 E4    bra  $F6CB                    ; (See routine at $f6a5)
-F6E7: 7C 00 5F inc  $005F                    ; (See routine at $f6a5)
-F6EA: 16       tab                           ; (See routine at $f6a5)
-F6EB: CE 0C 77 ldx  #$0C77                   ; (See routine at $f6a5)
-F6EE: 7E F1 DB jmp  $F1DB                    ; (See routine at $f6a5)
-
-
-;
-; A routine called from the main interrupt handler
-;
-; Identical to $f6a5-$f6c8, but with:
-;   Input  [$c80] instead of [$c74]
-;   Output [$c81] instead of [$c75]
-;   Memory $0060  instead of $005e
+; There are four creepers simulated by the PS4, all of which seem redundant (the
+; main CPU hasn't been seen trying read their results). This one, however, is
+; at least fed something by the CPU: the current level's wind speed. You'd think
+; the output would then be used to determine how many iterations of the bubble-
+; drifting simulation to run for that frame. But no. The main CPU doesn't even
+; try read it.
 ;
 
-F6F1: CE 0C 80 ldx  #$0C80                   ; (See routine at $f6a5)
-F6F4: BD F1 BF jsr  $F1BF                    ; (See routine at $f6a5)
-F6F7: CE F7 17 ldx  #$F717                   ; (See routine at $f6a5)
-F6FA: 3A       abx                           ; (See routine at $f6a5)
-F6FB: 3A       abx                           ; (See routine at $f6a5)
-F6FC: EE 00    ldx  $00,x                    ; (See routine at $f6a5)
-F6FE: F6 00 60 ldb  $0060                    ; (See routine at $f6a5)
-F701: 3A       abx                           ; (See routine at $f6a5)
-F702: A6 00    lda  $00,x                    ; (See routine at $f6a5)
-F704: 81 FF    cmpa #$FF                     ; (See routine at $f6a5)
-F706: 26 05    bne  $F70D                    ; (See routine at $f6a5)
-F708: 7F 00 60 clr  $0060                    ; (See routine at $f6a5)
-F70B: 20 E4    bra  $F6F1                    ; (See routine at $f6a5)
-F70D: 7C 00 60 inc  $0060                    ; (See routine at $f6a5)
-F710: 16       tab                           ; (See routine at $f6a5)
-F711: CE 0C 81 ldx  #$0C81                   ; (See routine at $f6a5)
-F714: 7E F1 DB jmp  $F1DB                    ; (See routine at $f6a5)
+F6CB: CE 0C 76 ldx  #$0C76                   ; Fetch table source from [$c76]
+F6CE: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F6D1: CE F7 17 ldx  #$F717                   ; Point X to CREEPER_TABLES
+F6D4: 3A       abx                           ; Table entries are 16-bit..
+F6D5: 3A       abx                           ; ..so add the index twice
+F6D6: EE 00    ldx  $00,x                    ; Load the 16-bit table entry into X
+
+; We now have a creeper table base pointer in X
+F6D8: F6 00 5F ldb  $005F                    ; Retrieve current sequence index
+F6DB: 3A       abx                           ; Add it to table base
+F6DC: A6 00    lda  $00,x                    ; Fetch sequence value into A 
+F6DE: 81 FF    cmpa #$FF                     ; Was table entry $ff? (the sentinel)
+F6E0: 26 05    bne  $F6E7                    ; If not, continue
+F6E2: 7F 00 5F clr  $005F                    ; If so, reset sequence index to 0..
+F6E5: 20 E4    bra  $F6CB                    ; ..and re-run from the start
+
+F6E7: 7C 00 5F inc  $005F                    ; Increment sequence index
+F6EA: 16       tab                           ; Transfer sequence value to B..
+F6EB: CE 0C 77 ldx  #$0C77                   ; ..to output at [$c77]
+F6EE: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
 
 
-; A table for code at PROCESS_C72_C74, as well as the routines that start at
-; $f6cb/$f6f7. 
+;
+; PROCESS_CREEPER_C80:
+; (Called from the main interrupt handler)
+;
+; A creeper (see PROCESS_CREEPER_C76) using:
+;   - table source [$c80]
+;   - output value [$c81]
+;   - sequence index at $0060
+;
 
-F717: F7 69    .word $F769
-F719: F7 6B    .word $F76B
-F71B: F7 76    .word $F776
-F71D: F7 7C    .word $F77C
-F71F: F7 87    .word $F787
-F721: F7 8D    .word $F78D
-F723: F7 90    .word $F790
-F725: F7 96    .word $F796
-F727: F7 A1    .word $F7A1
-F729: F7 A7    .word $F7A7
-F72B: F7 B2    .word $F7B2
-F72D: F7 B4    .word $F7B4
-F72F: F7 BF    .word $F7BF
-F731: F7 C5    .word $F7C5
-F733: F7 D0    .word $F7D0
-F735: F7 D6    .word $F7D6
-F737: F7 D9    .word $F7D9
-F739: F7 DF    .word $F7DF
-F73B: F7 EA    .word $F7EA
-F73D: F7 F0    .word $F7F0
-F73F: F7 FB    .word $F7FB
-F741: F7 FD    .word $F7FD
-F743: F8 08    .word $F808
-F745: F8 0E    .word $F80E
-F747: F8 19    .word $F819
-F749: F8 1F    .word $F81F
-F74B: F8 22    .word $F822
-F74D: F8 28    .word $F828
-F74F: F8 33    .word $F833
-F751: F8 39    .word $F839
-F753: F8 44    .word $F844
-F755: F8 46    .word $F846
-F757: F8 51    .word $F851
-F759: F8 57    .word $F857 
-F75C: F8 62    .word $F862
-F75D: F8 68    .word $F868
-F75F: F8 6B    .word $F86B
-F761: F8 71    .word $F871
-F763: F8 7C    .word $F87C
-F765: F8 82    .word $F882
-F767: F8 8D    .word $F88D
+F6F1: CE 0C 80 ldx  #$0C80                   ; (See routine at $f6cb)
+F6F4: BD F1 BF jsr  $F1BF                    ; (See routine at $f6cb)
+F6F7: CE F7 17 ldx  #$F717                   ; (See routine at $f6cb)
+F6FA: 3A       abx                           ; (See routine at $f6cb)
+F6FB: 3A       abx                           ; (See routine at $f6cb)
+F6FC: EE 00    ldx  $00,x                    ; (See routine at $f6cb)
+F6FE: F6 00 60 ldb  $0060                    ; (See routine at $f6cb)
+F701: 3A       abx                           ; (See routine at $f6cb)
+F702: A6 00    lda  $00,x                    ; (See routine at $f6cb)
+F704: 81 FF    cmpa #$FF                     ; (See routine at $f6cb)
+F706: 26 05    bne  $F70D                    ; (See routine at $f6cb)
+F708: 7F 00 60 clr  $0060                    ; (See routine at $f6cb)
+F70B: 20 E4    bra  $F6F1                    ; (See routine at $f6cb)
+F70D: 7C 00 60 inc  $0060                    ; (See routine at $f6cb)
+F710: 16       tab                           ; (See routine at $f6cb)
+F711: CE 0C 81 ldx  #$0C81                   ; (See routine at $f6cb)
+F714: 7E F1 DB jmp  $F1DB                    ; (See routine at $f6cb)
 
-; There now follow a whole sequence of tables with one-byte values, not .word's.
-; TODO: change the layout
 
-F769: 00 FF    .word $00FF
-F76B: 01 00    .word $0100
-F76D: 00 00    .word $0000
-F76F: 00 00    .word $0000
-F771: 00 00    .word $0000
-F773: 00 00    .word $0000
-F775: FF 01    .word $FF01
-F777: 00 00    .word $0000
-F779: 00 00    .word $0000
-F77B: FF 01    .word $FF01
-F77D: 00 00    .word $0000
-F77F: 01 00    .word $0100
-F781: 00 01    .word $0001
-F783: 00 00    .word $0000
-F785: 00 FF    .word $00FF
-F787: 01 00    .word $0100
-F789: 01 00    .word $0100
-F78B: 00 FF    .word $00FF
-F78D: 01 00    .word $0100
-F78F: FF 01    .word $FF01
-F791: 00 01    .word $0001
-F793: 00 01    .word $0001
-F795: FF 01    .word $FF01
-F797: 01 00    .word $0100
-F799: 01 01    .word $0101
-F79B: 00 01    .word $0001
-F79D: 01 00    .word $0100
-F79F: 01 FF    .word $01FF
-F7A1: 01 01    .word $0101
-F7A3: 01 01    .word $0101
-F7A5: 00 FF    .word $00FF
-F7A7: 01 01    .word $0101
-F7A9: 01 01    .word $0101
-F7AB: 01 01    .word $0101
-F7AD: 01 01    .word $0101
-F7AF: 01 00    .word $0100
-F7B1: FF 01    .word $FF01
-F7B3: FF 01    .word $FF01
-F7B5: 01 01    .word $0101
-F7B7: 01 01    .word $0101
-F7B9: 01 01    .word $0101
-F7BB: 01 01    .word $0101
-F7BD: 02 FF    .word $02FF
-F7BF: 01 01    .word $0101
-F7C1: 01 01    .word $0101
-F7C3: 02 FF    .word $02FF
-F7C5: 02 01    .word $0201
-F7C7: 01 01    .word $0101
-F7C9: 02 01    .word $0201
-F7CB: 01 01    .word $0101
-F7CD: 02 01    .word $0201
-F7CF: FF 01    .word $FF01
-F7D1: 02 01    .word $0201
-F7D3: 01 02    .word $0102
-F7D5: FF 01    .word $FF01
-F7D7: 02 FF    .word $02FF
-F7D9: 02 01    .word $0201
-F7DB: 02 01    .word $0201
-F7DD: 02 FF    .word $02FF
-F7DF: 02 02    .word $0202
-F7E1: 02 02    .word $0202
-F7E3: 01 02    .word $0102
-F7E5: 02 02    .word $0202
-F7E7: 01 01    .word $0101
-F7E9: FF 01    .word $FF01
-F7EB: 02 02    .word $0202
-F7ED: 02 02    .word $0202
-F7EF: FF 02    .word $FF02
-F7F1: 02 02    .word $0202
-F7F3: 02 02    .word $0202
-F7F5: 02 02    .word $0202
-F7F7: 02 02    .word $0202
-F7F9: 01 FF    .word $01FF
-F7FB: 02 FF    .word $02FF
-F7FD: 03 02    .word $0302
-F7FF: 02 02    .word $0202
-F801: 02 02    .word $0202
-F803: 02 02    .word $0202
-F805: 02 02    .word $0202
-F807: FF 02    .word $FF02
-F809: 02 02    .word $0202
-F80B: 02 03    .word $0203
-F80D: FF 03    .word $FF03
-F80F: 02 02    .word $0202
-F811: 02 03    .word $0203
-F813: 02 02    .word $0202
-F815: 02 03    .word $0203
-F817: 02 FF    .word $02FF
-F819: 02 03    .word $0203
-F81B: 02 02    .word $0202
-F81D: 03 FF    .word $03FF
-F81F: 02 03    .word $0203
-F821: FF 03    .word $FF03
-F823: 02 03    .word $0203
-F825: 02 03    .word $0203
-F827: FF 03    .word $FF03
-F829: 03 03    .word $0303
-F82B: 03 02    .word $0302
-F82D: 03 03    .word $0303
-F82F: 03 02    .word $0302
-F831: 02 FF    .word $02FF
-F833: 02 03    .word $0203
-F835: 03 03    .word $0303
-F837: 03 FF    .word $03FF
-F839: 03 03    .word $0303
-F83B: 03 03    .word $0303
-F83D: 03 02    .word $0302
-F83F: 03 03    .word $0303
-F841: 03 03    .word $0303
-F843: FF 03    .word $FF03
-F845: FF 04    .word $FF04
-F847: 03 03    .word $0303
-F849: 03 03    .word $0303
-F84B: 03 03    .word $0303
-F84D: 03 03    .word $0303
-F84F: 03 FF    .word $03FF
-F851: 03 03    .word $0303
-F853: 03 03    .word $0303
-F855: 04 FF    .word $04FF
-F857: 04 03    .word $0403
-F859: 03 03    .word $0303
-F85B: 04 03    .word $0403
-F85D: 03 03    .word $0303
-F85F: 04 03    .word $0403
-F861: FF 03    .word $FF03
-F863: 04 03    .word $0403
-F865: 03 04    .word $0304
-F867: FF 03    .word $FF03
-F869: 04 FF    .word $04FF
-F86B: 04 03    .word $0403
-F86D: 04 03    .word $0403
-F86F: 04 FF    .word $04FF
-F871: 04 04    .word $0404
-F873: 04 04    .word $0404
-F875: 03 04    .word $0304
-F877: 04 04    .word $0404
-F879: 03 03    .word $0303
-F87B: FF 03    .word $FF03
-F87D: 04 04    .word $0404
-F87F: 04 04    .word $0404
-F881: FF 04    .word $FF04
-F883: 04 04    .word $0404
-F885: 04 04    .word $0404
-F887: 03 04    .word $0304
-F889: 04 04    .word $0404
-F88B: 04 FF    .word $04FF
-F88D: 04 FF    .word $04FF
-F88F: FF FF    .word $FFFF
-F891: FF FF    .word $FFFF
-F893: FF FF    .word $FFFF
-F895: FF FF    .word $FFFF
-F897: FF FF    .word $FFFF
+;
+; CREEPER_TABLES:
+;
+; The data below is useful for work that needs to be performed, on average,
+; a non-integer number of times per frame.
+;
+; Each entry in the table points to a sequence which has a specific average
+; value, in increments of one-tenth.
+;
+; For example, entry 12 is CREEPER_TABLE_1_2, a sequence that has an average
+; value per entry of 1.2. Each sequence ends in the byte $ff.
+;
+
+F717: F7 69    .word $F769                   ; CREEPER_TABLE_0
+F719: F7 6B    .word $F76B                   ; CREEPER_TABLE_0_1
+F71B: F7 76    .word $F776                   ; CREEPER_TABLE_0_2
+F71D: F7 7C    .word $F77C                   ; CREEPER_TABLE_0_3
+F71F: F7 87    .word $F787                   ; CREEPER_TABLE_0_4
+F721: F7 8D    .word $F78D                   ; CREEPER_TABLE_0_5
+F723: F7 90    .word $F790                   ; CREEPER_TABLE_0_6
+F725: F7 96    .word $F796                   ; CREEPER_TABLE_0_7
+F727: F7 A1    .word $F7A1                   ; CREEPER_TABLE_0_8
+F729: F7 A7    .word $F7A7                   ; CREEPER_TABLE_0_9
+F72B: F7 B2    .word $F7B2                   ; CREEPER_TABLE_1
+F72D: F7 B4    .word $F7B4                   ; CREEPER_TABLE_1_1
+F72F: F7 BF    .word $F7BF                   ; CREEPER_TABLE_1_2
+F731: F7 C5    .word $F7C5                   ; CREEPER_TABLE_1_3
+F733: F7 D0    .word $F7D0                   ; CREEPER_TABLE_1_4
+F735: F7 D6    .word $F7D6                   ; CREEPER_TABLE_1_5
+F737: F7 D9    .word $F7D9                   ; CREEPER_TABLE_1_6
+F739: F7 DF    .word $F7DF                   ; CREEPER_TABLE_1_7
+F73B: F7 EA    .word $F7EA                   ; CREEPER_TABLE_1_8
+F73D: F7 F0    .word $F7F0                   ; CREEPER_TABLE_1_9
+F73F: F7 FB    .word $F7FB                   ; CREEPER_TABLE_2
+F741: F7 FD    .word $F7FD                   ; CREEPER_TABLE_2_1
+F743: F8 08    .word $F808                   ; CREEPER_TABLE_2_2
+F745: F8 0E    .word $F80E                   ; CREEPER_TABLE_2_3
+F747: F8 19    .word $F819                   ; CREEPER_TABLE_2_4
+F749: F8 1F    .word $F81F                   ; CREEPER_TABLE_2_5
+F74B: F8 22    .word $F822                   ; CREEPER_TABLE_2_6
+F74D: F8 28    .word $F828                   ; CREEPER_TABLE_2_7
+F74F: F8 33    .word $F833                   ; CREEPER_TABLE_2_8
+F751: F8 39    .word $F839                   ; CREEPER_TABLE_2_9
+F753: F8 44    .word $F844                   ; CREEPER_TABLE_3
+F755: F8 46    .word $F846                   ; CREEPER_TABLE_3_1
+F757: F8 51    .word $F851                   ; CREEPER_TABLE_3_2
+F759: F8 57    .word $F857                   ; CREEPER_TABLE_3_3
+F75C: F8 62    .word $F862                   ; CREEPER_TABLE_3_4
+F75D: F8 68    .word $F868                   ; CREEPER_TABLE_3_5
+F75F: F8 6B    .word $F86B                   ; CREEPER_TABLE_3_6
+F761: F8 71    .word $F871                   ; CREEPER_TABLE_3_7
+F763: F8 7C    .word $F87C                   ; CREEPER_TABLE_3_8
+F765: F8 82    .word $F882                   ; CREEPER_TABLE_3_9
+F767: F8 8D    .word $F88D                   ; CREEPER_TABLE_4
+
+
+; CREEPER_TABLE_0:
+; Average 0 (sum 0 in 1 entries)
+F769: 00       .byte $00
+F76A: FF       .byte $FF
+
+; CREEPER_TABLE_0_1:
+; Average 0.1 (sum 1 in 10 entries)
+F76B: 01       .byte $01
+F76C: 00       .byte $00
+F76D: 00       .byte $00
+F76E: 00       .byte $00
+F76F: 00       .byte $00
+F770: 00       .byte $00
+F771: 00       .byte $00
+F772: 00       .byte $00
+F773: 00       .byte $00
+F774: 00       .byte $00
+F775: FF       .byte $FF
+
+; CREEPER_TABLE_0_2:
+; Average 0.2 (sum 1 in 5 entries)
+F776: 01       .byte $01
+F777: 00       .byte $00
+F778: 00       .byte $00
+F779: 00       .byte $00
+F77A: 00       .byte $00
+F77B: FF       .byte $FF
+
+; CREEPER_TABLE_0_3:
+; Average 0.3 (sum 3 in 10 entries)
+F77C: 01       .byte $01
+F77D: 00       .byte $00
+F77E: 00       .byte $00
+F77F: 01       .byte $01
+F780: 00       .byte $00
+F781: 00       .byte $00
+F782: 01       .byte $01
+F783: 00       .byte $00
+F784: 00       .byte $00
+F785: 00       .byte $00
+F786: FF       .byte $FF
+
+; CREEPER_TABLE_0_4:
+; Average 0.4 (sum 2 in 5 entries)
+F787: 01       .byte $01
+F788: 00       .byte $00
+F789: 01       .byte $01
+F78A: 00       .byte $00
+F78B: 00       .byte $00
+F78C: FF       .byte $FF
+
+; CREEPER_TABLE_0_5:
+; Average 0.5 (sum 1 in 2 entries)
+F78D: 01       .byte $01
+F78E: 00       .byte $00
+F78F: FF       .byte $FF
+
+; CREEPER_TABLE_0_6:
+; Average 0.6 (sum 3 in 5 entries)
+F790: 01       .byte $01
+F791: 00       .byte $00
+F792: 01       .byte $01
+F793: 00       .byte $00
+F794: 01       .byte $01
+F795: FF       .byte $FF
+
+; CREEPER_TABLE_0_7:
+; Average 0.7 (sum 7 in 10 entries)
+F796: 01       .byte $01
+F797: 01       .byte $01
+F798: 00       .byte $00
+F799: 01       .byte $01
+F79A: 01       .byte $01
+F79B: 00       .byte $00
+F79C: 01       .byte $01
+F79D: 01       .byte $01
+F79E: 00       .byte $00
+F79F: 01       .byte $01
+F7A0: FF       .byte $FF
+
+; CREEPER_TABLE_0_8:
+; Average 0.8 (sum 4 in 5 entries)
+F7A1: 01       .byte $01
+F7A2: 01       .byte $01
+F7A3: 01       .byte $01
+F7A4: 01       .byte $01
+F7A5: 00       .byte $00
+F7A6: FF       .byte $FF
+
+; CREEPER_TABLE_0_9:
+; Average 0.9 (sum 9 in 10 entries)
+F7A7: 01       .byte $01
+F7A8: 01       .byte $01
+F7A9: 01       .byte $01
+F7AA: 01       .byte $01
+F7AB: 01       .byte $01
+F7AC: 01       .byte $01
+F7AD: 01       .byte $01
+F7AE: 01       .byte $01
+F7AF: 01       .byte $01
+F7B0: 00       .byte $00
+F7B1: FF       .byte $FF
+
+; CREEPER_TABLE_1:
+; Average 1 (sum 1 in 1 entries)
+F7B2: 01       .byte $01
+F7B3: FF       .byte $FF
+
+; CREEPER_TABLE_1_1:
+; Average 1.1 (sum 11 in 10 entries)
+F7B4: 01       .byte $01
+F7B5: 01       .byte $01
+F7B6: 01       .byte $01
+F7B7: 01       .byte $01
+F7B8: 01       .byte $01
+F7B9: 01       .byte $01
+F7BA: 01       .byte $01
+F7BB: 01       .byte $01
+F7BC: 01       .byte $01
+F7BD: 02       .byte $02
+F7BE: FF       .byte $FF
+
+; CREEPER_TABLE_1_2:
+; Average 1.2 (sum 6 in 5 entries)
+F7BF: 01       .byte $01
+F7C0: 01       .byte $01
+F7C1: 01       .byte $01
+F7C2: 01       .byte $01
+F7C3: 02       .byte $02
+F7C4: FF       .byte $FF
+
+; CREEPER_TABLE_1_3:
+; Average 1.3 (sum 13 in 10 entries)
+F7C5: 02       .byte $02
+F7C6: 01       .byte $01
+F7C7: 01       .byte $01
+F7C8: 01       .byte $01
+F7C9: 02       .byte $02
+F7CA: 01       .byte $01
+F7CB: 01       .byte $01
+F7CC: 01       .byte $01
+F7CD: 02       .byte $02
+F7CE: 01       .byte $01
+F7CF: FF       .byte $FF
+
+; CREEPER_TABLE_1_4:
+; Average 1.4 (sum 7 in 5 entries)
+F7D0: 01       .byte $01
+F7D1: 02       .byte $02
+F7D2: 01       .byte $01
+F7D3: 01       .byte $01
+F7D4: 02       .byte $02
+F7D5: FF       .byte $FF
+
+; CREEPER_TABLE_1_5:
+; Average 1.5 (sum 3 in 2 entries)
+F7D6: 01       .byte $01
+F7D7: 02       .byte $02
+F7D8: FF       .byte $FF
+
+; CREEPER_TABLE_1_6:
+; Average 1.6 (sum 8 in 5 entries)
+F7D9: 02       .byte $02
+F7DA: 01       .byte $01
+F7DB: 02       .byte $02
+F7DC: 01       .byte $01
+F7DD: 02       .byte $02
+F7DE: FF       .byte $FF
+
+; CREEPER_TABLE_1_7:
+; Average 1.7 (sum 17 in 10 entries)
+F7DF: 02       .byte $02
+F7E0: 02       .byte $02
+F7E1: 02       .byte $02
+F7E2: 02       .byte $02
+F7E3: 01       .byte $01
+F7E4: 02       .byte $02
+F7E5: 02       .byte $02
+F7E6: 02       .byte $02
+F7E7: 01       .byte $01
+F7E8: 01       .byte $01
+F7E9: FF       .byte $FF
+
+; CREEPER_TABLE_1_8:
+; Average 1.8 (sum 9 in 5 entries)
+F7EA: 01       .byte $01
+F7EB: 02       .byte $02
+F7EC: 02       .byte $02
+F7ED: 02       .byte $02
+F7EE: 02       .byte $02
+F7EF: FF       .byte $FF
+
+; CREEPER_TABLE_1_9:
+; Average 1.9 (sum 19 in 10 entries)
+F7F0: 02       .byte $02
+F7F1: 02       .byte $02
+F7F2: 02       .byte $02
+F7F3: 02       .byte $02
+F7F4: 02       .byte $02
+F7F5: 02       .byte $02
+F7F6: 02       .byte $02
+F7F7: 02       .byte $02
+F7F8: 02       .byte $02
+F7F9: 01       .byte $01
+F7FA: FF       .byte $FF
+
+; CREEPER_TABLE_2:
+; Average 2 (sum 2 in 1 entries)
+F7FB: 02       .byte $02
+F7FC: FF       .byte $FF
+
+; CREEPER_TABLE_2_1:
+; Average 2.1 (sum 21 in 10 entries)
+F7FD: 03       .byte $03
+F7FE: 02       .byte $02
+F7FF: 02       .byte $02
+F800: 02       .byte $02
+F801: 02       .byte $02
+F802: 02       .byte $02
+F803: 02       .byte $02
+F804: 02       .byte $02
+F805: 02       .byte $02
+F806: 02       .byte $02
+F807: FF       .byte $FF
+
+; CREEPER_TABLE_2_2:
+; Average 2.2 (sum 11 in 5 entries)
+F808: 02       .byte $02
+F809: 02       .byte $02
+F80A: 02       .byte $02
+F80B: 02       .byte $02
+F80C: 03       .byte $03
+F80D: FF       .byte $FF
+
+; CREEPER_TABLE_2_3:
+; Average 2.3 (sum 23 in 10 entries)
+F80E: 03       .byte $03
+F80F: 02       .byte $02
+F810: 02       .byte $02
+F811: 02       .byte $02
+F812: 03       .byte $03
+F813: 02       .byte $02
+F814: 02       .byte $02
+F815: 02       .byte $02
+F816: 03       .byte $03
+F817: 02       .byte $02
+F818: FF       .byte $FF
+
+; CREEPER_TABLE_2_4:
+; Average 2.4 (sum 12 in 5 entries)
+F819: 02       .byte $02
+F81A: 03       .byte $03
+F81B: 02       .byte $02
+F81C: 02       .byte $02
+F81D: 03       .byte $03
+F81E: FF       .byte $FF
+
+; CREEPER_TABLE_2_5:
+; Average 2.5 (sum 5 in 2 entries)
+F81F: 02       .byte $02
+F820: 03       .byte $03
+F821: FF       .byte $FF
+
+; CREEPER_TABLE_2_6:
+; Average 2.6 (sum 13 in 5 entries)
+F822: 03       .byte $03
+F823: 02       .byte $02
+F824: 03       .byte $03
+F825: 02       .byte $02
+F826: 03       .byte $03
+F827: FF       .byte $FF
+
+; CREEPER_TABLE_2_7:
+; Average 2.7 (sum 27 in 10 entries)
+F828: 03       .byte $03
+F829: 03       .byte $03
+F82A: 03       .byte $03
+F82B: 03       .byte $03
+F82C: 02       .byte $02
+F82D: 03       .byte $03
+F82E: 03       .byte $03
+F82F: 03       .byte $03
+F830: 02       .byte $02
+F831: 02       .byte $02
+F832: FF       .byte $FF
+
+; CREEPER_TABLE_2_8:
+; Average 2.8 (sum 14 in 5 entries)
+F833: 02       .byte $02
+F834: 03       .byte $03
+F835: 03       .byte $03
+F836: 03       .byte $03
+F837: 03       .byte $03
+F838: FF       .byte $FF
+
+; CREEPER_TABLE_2_9:
+; Average 2.9 (sum 29 in 10 entries)
+F839: 03       .byte $03
+F83A: 03       .byte $03
+F83B: 03       .byte $03
+F83C: 03       .byte $03
+F83D: 03       .byte $03
+F83E: 02       .byte $02
+F83F: 03       .byte $03
+F840: 03       .byte $03
+F841: 03       .byte $03
+F842: 03       .byte $03
+F843: FF       .byte $FF
+
+; CREEPER_TABLE_3:
+; Average 3 (sum 3 in 1 entries)
+F844: 03       .byte $03
+F845: FF       .byte $FF
+
+; CREEPER_TABLE_3_1:
+; Average 3.1 (sum 31 in 10 entries)
+F846: 04       .byte $04
+F847: 03       .byte $03
+F848: 03       .byte $03
+F849: 03       .byte $03
+F84A: 03       .byte $03
+F84B: 03       .byte $03
+F84C: 03       .byte $03
+F84D: 03       .byte $03
+F84E: 03       .byte $03
+F84F: 03       .byte $03
+F850: FF       .byte $FF
+
+; CREEPER_TABLE_3_2:
+; Average 3.2 (sum 16 in 5 entries)
+F851: 03       .byte $03
+F852: 03       .byte $03
+F853: 03       .byte $03
+F854: 03       .byte $03
+F855: 04       .byte $04
+F856: FF       .byte $FF
+
+; CREEPER_TABLE_3_3:
+; Average 3.3 (sum 33 in 10 entries)
+F857: 04       .byte $04
+F858: 03       .byte $03
+F859: 03       .byte $03
+F85A: 03       .byte $03
+F85B: 04       .byte $04
+F85C: 03       .byte $03
+F85D: 03       .byte $03
+F85E: 03       .byte $03
+F85F: 04       .byte $04
+F860: 03       .byte $03
+F861: FF       .byte $FF
+
+; CREEPER_TABLE_3_4:
+; Average 3.4 (sum 17 in 5 entries)
+F862: 03       .byte $03
+F863: 04       .byte $04
+F864: 03       .byte $03
+F865: 03       .byte $03
+F866: 04       .byte $04
+F867: FF       .byte $FF
+
+; CREEPER_TABLE_3_5:
+; Average 3.5 (sum 7 in 2 entries)
+F868: 03       .byte $03
+F869: 04       .byte $04
+F86A: FF       .byte $FF
+
+; CREEPER_TABLE_3_6:
+; Average 3.6 (sum 18 in 5 entries)
+F86B: 04       .byte $04
+F86C: 03       .byte $03
+F86D: 04       .byte $04
+F86E: 03       .byte $03
+F86F: 04       .byte $04
+F870: FF       .byte $FF
+
+; CREEPER_TABLE_3_7:
+; Average 3.7 (sum 37 in 10 entries)
+F871: 04       .byte $04
+F872: 04       .byte $04
+F873: 04       .byte $04
+F874: 04       .byte $04
+F875: 03       .byte $03
+F876: 04       .byte $04
+F877: 04       .byte $04
+F878: 04       .byte $04
+F879: 03       .byte $03
+F87A: 03       .byte $03
+F87B: FF       .byte $FF
+
+; CREEPER_TABLE_3_8:
+; Average 3.8 (sum 19 in 5 entries)
+F87C: 03       .byte $03
+F87D: 04       .byte $04
+F87E: 04       .byte $04
+F87F: 04       .byte $04
+F880: 04       .byte $04
+F881: FF       .byte $FF
+
+; CREEPER_TABLE_3_9:
+; Average 3.9 (sum 39 in 10 entries)
+F882: 04       .byte $04
+F883: 04       .byte $04
+F884: 04       .byte $04
+F885: 04       .byte $04
+F886: 04       .byte $04
+F887: 03       .byte $03
+F888: 04       .byte $04
+F889: 04       .byte $04
+F88A: 04       .byte $04
+F88B: 04       .byte $04
+F88C: FF       .byte $FF
+
+; CREEPER_TABLE_4:
+; Average 4 (sum 4 in 1 entries)
+F88D: 04       .byte $04
+F88E: FF       .byte $FF
+;
+; Creeper tables post-amble
+;
+; Whenever a creeper table is changed, there's a chance that the current creeper
+; index is already beyond the end of the table. That's usually harmless:
+; eventually it'll hit an $ff and return to the start. But for the last table,
+; we need enough extra $ff's as padding that no index value could go beyond.
+;
+F88F: FF       .byte $FF
+F890: FF       .byte $FF
+F891: FF       .byte $FF
+F892: FF       .byte $FF
+F893: FF       .byte $FF
+F894: FF       .byte $FF
+F895: FF       .byte $FF
+F896: FF       .byte $FF
+F897: FF       .byte $FF
+F898: FF       .byte $FF
 
 
 ;
@@ -2022,6 +2311,8 @@ F9A9: C6 FF    ldb  #$FF
 F9AB: CE 0F 90 ldx  #$0F90
 F9AE: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
 
+
+;
 ; This is a table, accessed in $F914 and $F94E. It seems to point to other
 ; tables. I don't yet know why.
 ;
@@ -2682,8 +2973,12 @@ FEB7: 09 5F    .byte $09,$5F
 FEB9: 03 0A    .byte $03,$0A
 
 
+;
+; CONFIGURE_MCU:
+;
 ; Bulk of the cold start routine, jumped to immediately from the actual start
-; of the cold start handler ($f000)
+; of the cold start handler ($f000). It's concerned with configuring the ports
+; and features of the microcontroller.
 ;
 FEBB: 8E 00 FF lds  #$00FF
 FEBE: 0F       sei  
