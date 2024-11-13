@@ -14,19 +14,30 @@
 ;
 ; TL;DR: PS4 roles include:
 ;   - interfacing with player controls, DIP switches, the coin mechanisms and
-;     cabinet switches
+;     cabinet switches, and relaying their values to the main CPU
 ;   - informing the beasties of where the players are
 ;   - rotating which EXTEND bubbles the players are given
 ;   - effecting functionality for the clock special item
 ;   - generating interrupts on the main CPU
-;   - ...and possibly more
 ;
-; Suffice it to say, one does not _need_ a microcontroller to do any of the above.
-; The PS4's real purpose is to move some vital functionality behind an opaque
-; curtain. It also appears from the code below that Taito had intended for the
-; PS4 to have additional functionality (killing the player if they touch a
-; beastie, and maybe handling the credit count), but showstopper bugs forced
-; those to be handled on the main CPU instead.
+; Suffice it to say, one does not _need_ a microcontroller to do any of the
+; above. The PS4's real purpose is to move some vital functionality behind an
+; opaque curtain. However, it seems obvious from the code that Taito had
+; intended for more functionality to be on the PS4 than just the above.
+; Specifically, we see routines and data hookups for:
+;
+;   - performing collision detection between players and level beasties
+;     (not Skel Monsta/Baron von Blubba)
+;   - controlling the speed of the wind simulation
+;   - owning the credits count
+;
+; ...where the calculations are performed on the PS4, but their results ignored
+; by the main CPU. In the case of the beastie collision detection, there's a
+; clear showstopper bug preventing its use. For the others, less so. There are
+; additional functions whose mechanics seem arbitrary enough to be unguessable,
+; and which don't seem to get triggered by in-game actions, so we may never
+; know what the intention was.
+; 
 ;
 ;
 ; The 6801U4 is a microcontroller variant of the 6800 microprocessor, with 4KiB
@@ -746,7 +757,7 @@ F1C3: 97 02    sta  $02
 ; Set port 3 (data bus) data direction register to be reading from it
 F1C5: 7F 00 04 clr  $0004
 
-; Put out the address with /SORAM low. Then set /SORAM high to kick off the request
+; Put out the address with /SORAM low. Then set /SORAM high to kick off the request.
 ;
 F1C8: FF 00 4A stx  $004A                    ; Stash shared RAM address in $004a..
 F1CB: FC 00 4A ldd  $004A                    ; ..maybe just to move X to A and B?
@@ -958,9 +969,9 @@ F2B7: 27 5D    beq  $F316                    ;       ..jump to $f316
 F2B9: C1 08    cmpb #$08                     ; If $08..
 F2BB: 27 72    beq  $F32F                    ;       ..jump to $f32f
 
-
 ; [$c6f] wasn't 1, 2, 4 or 8.
 ; If [$f95] != $42 (66), skip to return
+;
 F2BD: CE 0F 95 ldx  #$0F95
 F2C0: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
 F2C3: C1 42    cmpb #$42
@@ -970,7 +981,7 @@ F2C5: 26 0C    bne  $F2D3                    ; rts
 ; accumulator onto the stack and then try rts. Which would be sure to fail
 ; because the top of the stack just had the accumulator pushed to it. So this
 ; is pretty puzzling.
-
+;
 F2C7: CE 0C 24 ldx  #$0C24
 F2CA: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
 F2CD: F1 00 52 cmpb $0052
@@ -979,6 +990,7 @@ F2D2: 36       psha
 F2D3: 39       rts  
 
 ; Reached when [$c6f] == $01
+;
 F2D4: CE 00 01 ldx  #$0001
 F2D7: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
 F2DA: 54       lsrb 
@@ -999,6 +1011,7 @@ F2F5: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 F2F8: 39       rts  
 
 ; Reached when [$c6f] == $02
+;
 F2F9: CE 0C 24 ldx  #$0C24
 F2FC: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
 F2FF: C1 0A    cmpb #$0A
@@ -1013,6 +1026,7 @@ F312: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 F315: 39       rts  
 
 ; Reached when [$c6f] == $04
+;
 F316: CE 0C 24 ldx  #$0C24
 F319: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
 F31C: 5A       decb 
@@ -1025,6 +1039,7 @@ F32B: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 F32E: 39       rts  
 
 ; Reached when [$c6f] == $08
+;
 F32F: C6 0A    ldb  #$0A
 F331: F7 00 52 stb  $0052
 F334: CE 0C 24 ldx  #$0C24
@@ -1035,6 +1050,7 @@ F33F: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 F342: 39       rts  
 
 ; A small table, called from $f380 and $f2e0
+;
 F343: 01       .byte $01
 F344: 00       .byte $00
 F345: 04       .byte $04
