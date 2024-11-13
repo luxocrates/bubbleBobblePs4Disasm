@@ -393,6 +393,7 @@ F01D: 7F 00 18 clr  $0018                    ; Clear timer control register 2
 F020: 7F 00 11 clr  $0011                    ; Clear transmit/receive control and status register
 
 ; Initialize RAM (all 192 bytes of it!)
+;
 F023: CE 00 40 ldx  #$0040                   ; Point X to RAM base (device registers come before)
 F026: C6 C0    ldb  #$C0                     ; Loop counter: 192
 F028: 6F 00    clr  $00,x                    ; Empty byte
@@ -401,6 +402,7 @@ F02B: 5A       decb                          ; Decrement loop counter
 F02C: 26 FA    bne  $F028                    ; Loop
 
 ; Final port configuration and self-test
+;
 F02E: BD F2 36 jsr  $F236                    ; Call RELAY_PORTS
 F031: BD F1 8F jsr  $F18F                    ; Call SET_OUT_AND_1_2_WAY
 F034: BD F1 96 jsr  $F196                    ; Call TEST_FOR_STUCK_COINS
@@ -1421,9 +1423,9 @@ F4FD: 32       pula                          ; Retrieve stashed absolute Y delta
 F4FE: 81 08    cmpa #$08
 F500: 24 03    bcc  $F505
 
-; A Y collision has happened.
+; A Y collision has happened
 ;
-; Raise a flag for the X collision detector to consider.
+; Raise a flag for the X collision detector to consider
 ;
 F502: 7C 00 5C inc  $005C                    ; Bump the Y overlap count
 
@@ -1449,7 +1451,7 @@ F51C: 20 02    bra  $F520                    ; Commit it and move on
 ; Player has the same X pos as beastie
 F51E: C6 80    ldb  #$80                     ; Output code will be $80
 
-; Write output code to the thid byte of beastie output structure
+; Write output code to the third byte of beastie output structure
 F520: FE 00 5A ldx  $005A                    ; Point X to beastie output structure base..
 F523: 08       inx                           ; ..and add..
 F524: 08       inx                           ; ..two
