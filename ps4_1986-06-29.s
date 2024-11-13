@@ -292,7 +292,13 @@
 ; 
 ; RAM
 ; ---
-; $0043:         Unknown (used at $f0b3)
+; $0040:         Last frame's port 1 data, shifted left 4 bits
+; $0041:         How COIN B has changed since last frame
+; $0042:         Last frame's port 1 data, shifted left 5 bits
+; $0043:         How COIN A has changed since last frame
+; $0044:         Last frame's port 1 data, shifted left 6 bits
+; $0045:         How SERVICE has changed since last frame
+; $0046:         Temporary storage for TRACK_MSB_CHANGE
 ; $0048:         Phony unactioned coins count
 ;                (An unactioned coin is where the game pricing would be, say,
 ;                2-coins-1-credit: after receiving the first coin, this is the
@@ -454,47 +460,48 @@ F0A4: 48       asla                          ; ..are in bits 7-4..
 F0A5: 48       asla                          ; ..and bits 3-0 are empty
 F0A6: C6 03    ldb  #$03                     ; Set loop counter to 3
 
-; Loop: iterate through the three bits that have COIN B, COIN A and SERVICE
-; inputs. This looks like it's calling a routine that processes the MSB, then
-; shifts to get the next one into the MSB, until it's done them all.
+; Iterate through the three bits that have COIN B, COIN A and SERVICE inputs.
+; This will end up with locations $0041, $0043 and $0045 containing a byte which
+; represents how the respective bit has changed since last frame.
 ;
-F0A8: 36       psha 
-F0A9: 37       pshb 
-F0AA: BD F1 6F jsr  $F16F
-F0AD: 33       pulb 
-F0AE: 32       pula 
-F0AF: 48       asla 
-F0B0: 5A       decb 
+F0A8: 36       psha                          ; Preserve regs..
+F0A9: 37       pshb                          ; ..
+F0AA: BD F1 6F jsr  $F16F                    ; Call TRACK_MSB_CHANGE
+F0AD: 33       pulb                          ; Retrieve regs..
+F0AE: 32       pula                          ; ..
+F0AF: 48       asla                          ; Shift the next MSB into place
+F0B0: 5A       decb                          ; Decrement remaining count
 F0B1: 26 F5    bne  $F0A8                    ; Loop to next most significant bit
 
-F0B3: B6 00 43 lda  $0043                    ; Guessing this is a sum of coin inputs?
-F0B6: 81 00    cmpa #$00                     ; Did anything come in?
-F0B8: 26 39    bne  $F0F3                    ; If not, skip to part 2
+;
+; COIN A handler
+;
 
-; This part is only reached if there's an incoming credit
-;
-; But I don't (yet) understand how it handles the case when multiple coin inputs
-; fire at once. That _should_ award multiple times. Do we loop back here
-; somewhere?
-;
-F0BA: F6 00 4E ldb  $004E                    
-F0BD: 54       lsrb 
-F0BE: 54       lsrb 
-F0BF: 54       lsrb 
+F0B3: B6 00 43 lda  $0043                    ; Fetch COIN A change code
+F0B6: 81 00    cmpa #$00                     ; Falling edge?
+F0B8: 26 39    bne  $F0F3                    ; If not, skip to COIN B handler
 
-; Look up the coins/credits table
+; COIN A has a new coin. Consult the coins/credits table.
 ;
-F0C0: C4 06    andb #$06
+F0BA: F6 00 4E ldb  $004E                    ; Retrieve cached DIPs
+F0BD: 54       lsrb                          ; Shift right until..
+F0BE: 54       lsrb                          ; A-5 and A-6.. (check this)
+F0BF: 54       lsrb                          ; ..are in bits 1 and 2
+F0C0: C4 06    andb #$06                     ; Mask out all other bits
+
+; B is now a table offset. Table entries are two bytes each, which is why we
+; shifted the switch bits to start at bit 1, not bit 0.
+;
 F0C2: CE F1 87 ldx  #$F187                   ; Point X to PHONY_COINS_PER_CREDIT_TABLE
-F0C5: 3A       abx                           ; Add index
+F0C5: 3A       abx                           ; Add the offset
 F0C6: A6 00    lda  $00,x                    ; Load the coins value from the table
-F0C8: 81 01    cmpa #$01                     ; A 1-coin entry?
+F0C8: 81 01    cmpa #$01                     ; A one-coin entry?
 F0CA: 27 0D    beq  $F0D9                    ; If so, skip to $f0d9
 
 ; (Multiple) coins, (some number of) credits
 ;
 F0CC: 7C 00 48 inc  $0048                    ; Bump the phony unactioned coins count
-F0CF: A6 00    lda  $00,x                    ; Refetch the coins value table entry (redundant?)
+F0CF: A6 00    lda  $00,x                    ; Refetch the coins value table entry (unnecessary)
 F0D1: B1 00 48 cmpa $0048                    ; Have we received enough coins?
 F0D4: 26 1D    bne  $F0F3                    ; If not, skip to part 2
 F0D6: 7F 00 48 clr  $0048                    ; If so, reset the phony count
@@ -508,7 +515,7 @@ F0DF: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
 F0E2: 32       pula                          ; Retrieve stashed credits value
 F0E3: 1B       aba                           ; Add to the phony credits count
 F0E4: 16       tab                           ; Move it to B, so we can..
-F0E5: CE 0C 1E ldx  #$0C1E                   ; ..store the phony credits count
+F0E5: CE 0C 1E ldx  #$0C1E                   ; ..commit the count to shared RAM
 F0E8: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 
 ; Trigger the credit-inserted event on the phony credit event channel
@@ -518,68 +525,81 @@ F0EE: C6 01    ldb  #$01                     ; ..write $01 (a credit bump happen
 F0F0: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 
 ;
-; Part 2 of the coin procesing
+; COIN B handler
+; (Mirrors the COIN A handler)
 ;
-F0F3: B6 00 41 lda  $0041
-F0F6: 81 00    cmpa #$00
-F0F8: 26 3B    bne  $F135
-F0FA: F6 00 4E ldb  $004E
-F0FD: 54       lsrb                          ; Shift B right until it's..
-F0FE: 54       lsrb                          ; ..
-F0FF: 54       lsrb                          ; ..
-F100: 54       lsrb                          ; ..
-F101: 54       lsrb                          ; ..a 3-bit number
-F102: C4 06    andb #$06                     ; Then zero-out the LSB
-F104: CE F1 87 ldx  #$F187                   ; Data table pointer
-F107: 3A       abx  
-F108: A6 00    lda  $00,x
-F10A: 81 01    cmpa #$01
-F10C: 27 0D    beq  $F11B
-F10E: 7C 00 49 inc  $0049
-F111: A6 00    lda  $00,x
-F113: B1 00 49 cmpa $0049
-F116: 26 1D    bne  $F135
-F118: 7F 00 49 clr  $0049
-F11B: A6 01    lda  $01,x
-F11D: 36       psha 
-F11E: CE 0C 1E ldx  #$0C1E
-F121: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F124: 32       pula 
-F125: 1B       aba  
-F126: 16       tab  
-F127: CE 0C 1E ldx  #$0C1E
-F12A: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
-F12D: CE 0F 99 ldx  #$0F99                   ; Into phony credit event channel..
-F130: C6 01    ldb  #$01                     ; ..write $01 (a credit bump happened)
-F132: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+
+F0F3: B6 00 41 lda  $0041                    ; Fetch COIN B change code
+F0F6: 81 00    cmpa #$00                     ; (See routine at $f0b3)
+F0F8: 26 3B    bne  $F135                    ; Skips to SERVICE trigger handler
+F0FA: F6 00 4E ldb  $004E                    ; (See routine at $f0b3)
+F0FD: 54       lsrb                          ; (See routine at $f0b3)
+F0FE: 54       lsrb                          ; (See routine at $f0b3)
+F0FF: 54       lsrb                          ; (See routine at $f0b3)
+F100: 54       lsrb                          ; Two more than for COIN A
+F101: 54       lsrb                          ; Two more than for COIN A
+F102: C4 06    andb #$06                     ; (See routine at $f0b3)
+F104: CE F1 87 ldx  #$F187                   ; (See routine at $f0b3)
+F107: 3A       abx                           ; (See routine at $f0b3)
+F108: A6 00    lda  $00,x                    ; (See routine at $f0b3)
+F10A: 81 01    cmpa #$01                     ; (See routine at $f0b3)
+F10C: 27 0D    beq  $F11B                    ; (See routine at $f0b3)
+F10E: 7C 00 49 inc  $0049                    ; (See routine at $f0b3)
+F111: A6 00    lda  $00,x                    ; (See routine at $f0b3)
+F113: B1 00 49 cmpa $0049                    ; (See routine at $f0b3)
+F116: 26 1D    bne  $F135                    ; Skips to SERVICE trigger handler
+F118: 7F 00 49 clr  $0049                    ; (See routine at $f0b3)
+F11B: A6 01    lda  $01,x                    ; (See routine at $f0b3)
+F11D: 36       psha                          ; (See routine at $f0b3)
+F11E: CE 0C 1E ldx  #$0C1E                   ; (See routine at $f0b3)
+F121: BD F1 BF jsr  $F1BF                    ; (See routine at $f0b3)
+F124: 32       pula                          ; (See routine at $f0b3)
+F125: 1B       aba                           ; (See routine at $f0b3)
+F126: 16       tab                           ; (See routine at $f0b3)
+F127: CE 0C 1E ldx  #$0C1E                   ; (See routine at $f0b3)
+F12A: BD F1 DB jsr  $F1DB                    ; (See routine at $f0b3)
+F12D: CE 0F 99 ldx  #$0F99                   ; (See routine at $f0b3)
+F130: C6 01    ldb  #$01                     ; (See routine at $f0b3)
+F132: BD F1 DB jsr  $F1DB                    ; (See routine at $f0b3)
 
 ;
-; Part 3 - reconsider the coin lockouts?
+; SERVICE handler
 ;
-F135: B6 00 45 lda  $0045
-F138: 81 00    cmpa #$00
-F13A: 26 1A    bne  $F156
-F13C: CE 0C 1E ldx  #$0C1E
+
+F135: B6 00 45 lda  $0045                    ; Fetch SERVICE change code
+F138: 81 00    cmpa #$00                     ; Falling edge?
+F13A: 26 1A    bne  $F156                    ; If not, skip to lockouts handler
+
+F13C: CE 0C 1E ldx  #$0C1E                   ; Load phony credits count
 F13F: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F142: 86 08    lda  #$08
-F144: 11       cba  
-F145: 25 1A    bcs  $F161                    ; If carry, do ENABLE_COIN_LOCKOUTS and return
-F147: 5C       incb 
-F148: CE 0C 1E ldx  #$0C1E
+F142: 86 08    lda  #$08                     ; Compare 8..
+F144: 11       cba                           ; ..to the phony credits count
+F145: 25 1A    bcs  $F161                    ; If count >= 9, do ENABLE_COIN_LOCKOUTS and return
+
+F147: 5C       incb                          ; Increment the phony credits count
+F148: CE 0C 1E ldx  #$0C1E                   ; We'll commit it back to [$c1e]
 F14B: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
-F14E: CE 0F 99 ldx  #$0F99                   ; Into phony credit event channel..
-F151: C6 01    ldb  #$01                     ; ..write $01 (a credit bump happened)
+
+F14E: CE 0F 99 ldx  #$0F99                   ; Now commit to the phony credit event channel..
+F151: C6 01    ldb  #$01                     ; ..the value $01 (a credit bump happened)
 F153: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
-F156: CE 0C 1E ldx  #$0C1E
+
+;
+; Lockouts handler
+;
+
+F156: CE 0C 1E ldx  #$0C1E                   ; Load phony credits count
 F159: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F15C: 86 08    lda  #$08
-F15E: 11       cba  
-F15F: 24 07    bcc  $F168                    ; If not carry, do DISABLE_COIN_LOCKOUTS and return
+F15C: 86 08    lda  #$08                     ; Compared to 8..
+F15E: 11       cba                           ; ..is it larger?
+F15F: 24 07    bcc  $F168                    ; If not, do DISABLE_COIN_LOCKOUTS and return
 ; Falls through...
 
 
 ;
 ; ENABLE_COIN_LOCKOUTS:
+; (Called from both PROCESS_PHONY_CREDITS and PROCESS_COIN_LOCKOUTS, which
+; overrides the PS4-calculated value with one from the main CPU)
 ;
 ; Configures the coin mechs to not accept more coins
 ;
@@ -592,6 +612,8 @@ F167: 39       rts
 
 ;
 ; DISABLE_COIN_LOCKOUTS:
+; (Called from both PROCESS_PHONY_CREDITS and PROCESS_COIN_LOCKOUTS, which
+; overrides the PS4-calculated value with one from the main CPU)
 ;
 ; Configures the coin mechs to accept more coins
 ;
@@ -601,28 +623,43 @@ F16A: 9A 02    ora  $02                      ; OR port 1's current value
 F16C: 97 02    sta  $02                      ; Write it to port 1
 F16E: 39       rts  
 
+
 ;
-; A subroutine for PROCESS_PHONY_CREDITS
+; TRACK_MSB_CHANGE:
+; (A subroutine for PROCESS_PHONY_CREDITS)
 ;
-; On entry, X = $0040
-;           A = a byte where the MSB has a bit that, if low,
-;               should trigger a credit increment
+; On entry, X   = a RAM address
+;           A   = a byte where we only care about the MSB
+;           (X) = last frame's value of A
+;
+; On exit,  (X)   = this frame's value of A            (for incoming val. of X)
+;           (X+1) = How MSB of A has changed           (for incoming val. of X)
+;                   $00 = 1 last frame, 0 this frame
+;                   $01 = 0 last frame, 0 this frame
+;                   $02 = 1 last frame, 1 this frame
+;                   $03 = 0 last frame, 1 this frame
+;           X     = 2 + incoming val. of X
 ;
 
-F16F: B7 00 46 sta  $0046                    ; Store cabinet inputs in addr $0046
-F172: E6 00    ldb  $00,x                    ; ($0040) -> B
-F174: A7 00    sta  $00,x                    ; Store cabinet inputs in (X) (X = $0040)
-F176: 4F       clra 
-F177: 58       aslb 
-F178: 25 01    bcs  $F17B
-F17A: 4C       inca 
-F17B: 78 00 46 asl  $0046
-F17E: 24 02    bcc  $F182
-F180: 4C       inca 
-F181: 4C       inca 
-F182: A7 01    sta  $01,x
-F184: 08       inx  
-F185: 08       inx  
+F16F: B7 00 46 sta  $0046                    ; Stash incoming byte in $0046
+F172: E6 00    ldb  $00,x                    ; Load last frame's byte into B
+F174: A7 00    sta  $00,x                    ; Store this frame's byte into X
+F176: 4F       clra                          ; Stage a change code of $00
+
+; Set change code bit 0 based on last frame's MSB
+F177: 58       aslb                          ; Rotate prev frame's byte left
+F178: 25 01    bcs  $F17B                    ; If its bit 7 was set, skip
+F17A: 4C       inca                          ; Effectively, sets bit 0
+
+; Set change code bit 1 based on this frame's MSB
+F17B: 78 00 46 asl  $0046                    ; Shift this frame's byte left
+F17E: 24 02    bcc  $F182                    ; If its bit 7 was unset, skip
+F180: 4C       inca                          ; Effectively, sets..
+F181: 4C       inca                          ; .. bit 1
+
+F182: A7 01    sta  $01,x                    ; Store MSB change code
+F184: 08       inx                           ; Advance X..
+F185: 08       inx                           ; ..by 2
 F186: 39       rts  
 
 
