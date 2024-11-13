@@ -175,19 +175,24 @@
 ;
 ; [$c6f](rw) - Unknown (routine at $f2a7) (always reports 0 in my experience)
 ; [$c70](rw) - Parallel to [$c6f] (routine at $f347)
-
 ; [$c71](r)  - Unknown (routine at $f8d5) (credits prank?)
+
+; -- Creepers (see PROCESS_CREEPER_C76) ----------------------------------------
+
 ; [$c72](r)  - Seems unused (feeds creeper for [$c73])
 ; [$c73](w)  - Seems unused (fed from creeper for [$c72])
 ; [$c74](r)  - Seems unused (feeds creeper for [$c75])
 ; [$c75](w)  - Seems unused (fed from creeper for [$c74])
 ; [$c76](r)  - Wind speed   (feeds creeper for [$c77])
 ; [$c77](w)  - Seems unused (fed from creeper for [$c76])
-; ------------------------------------------------------------------------------
+;
+; -- Clock ---------------------------------------------------------------------
+;
 ; [$c78](rw) - Clock downcounter low byte
 ; [$c79](rw) - Clock downcounter high byte
 ; [$c7a](rw) - Clock is active (if not $00)
 ; [$c7b](w)  - Clock countdown complete, if PS4 writes $01
+
 ; ------------------------------------------------------------------------------
 ; [$c7c](rw) - Which EXTEND bubble the player would be offered if one appeared
 ;              right now
@@ -200,31 +205,25 @@
 ; [$c83](w)  - PS4 checksum low byte  (game will report error if nonzero)
 ; [$c85](w)  - PS4 ready reporting. Main CPU waits for PS4 to write $37 here.
 ;
-; ------------------------------------------------------------------------------
+; -- Translators (see PROCESS_TRANSLATOR_F88) ----------------------------------
 ;
-; Whatever's going on with..          [$f88]-[$f8b] and [$c88], at $f903
-;   ..mirrors what's happening with.. [$f8c]-[$f8f] and [$d88], at $f93d
-;   ..which also mirrors..            [$f90]-[$f93] and [$e88], at $f977
+; Theoretically, translators could target any other variables in the range
+; [$c88]-[$f87], but in practice are unused.
 ;
-; [$c88](w)  - Unknown (routine at $f903)
-; [$d88](w)  - Unknown (routine at $f93d)
-; [$e88](w)  - Unknown (routine at $f977)
+; [$f88](rw) - status            for translator at $f903
+; [$f89](r)  - index ptr         for translator at $f903
+; [$f8a](r)  - table ptr         for translator at $f903
+; [$f8b](r)  - output offset ptr for translator at $f903
 ;
-; [$f88](r)  - Unknown (routine at $f903)
-; [$f89](r)  - Unknown (routine at $f903)
-; [$f8a](r)  - Unknown (routine at $f903)
-; [$f8b](r)  - Unknown (routine at $f903)
+; [$f8c](rw) - status            for translator at $f93d
+; [$f8d](r)  - index ptr         for translator at $f93d
+; [$f8e](r)  - table ptr         for translator at $f93d
+; [$f8f](r)  - output offset ptr for translator at $f93d
 ;
-; [$f8c](rw) - Unknown (routine at $f93d)
-; [$f8d](r)  - Unknown (routine at $f93d)
-; [$f8e](r)  - Unknown (routine at $f93d)
-; [$f8f](r)  - Unknown (routine at $f93d)
-;
-; [$f90](rw) - Unknown (routine at $f977)
-; [$f91](r)  - Unknown (routine at $f977)
-; [$f92](r)  - Unknown (routine at $f977)
-; [$f93](r)  - Unknown (routine at $f977)
-;
+; [$f90](rw) - status            for translator at $f977
+; [$f91](r)  - index ptr         for translator at $f977
+; [$f92](r)  - table ptr         for translator at $f977
+; [$f93](r)  - output offset ptr for translator at $f977
 ; ------------------------------------------------------------------------------
 ;
 ; [$f94](r)  - Should coin lockouts accept more coins?
@@ -235,8 +234,8 @@
 ; [$f96](r)  - Delay after interrupt handler, if $47
 ; [$f97](r)  - Reboot PS4, if $4a
 ; [$f98](r)  - Generate main CPU interrupts, if $47
-; [$f99](w)  - Phony credit event: PS4 writes $01 here on credit bump, but
-;              main CPU doesn't read it
+; [$f99](w)  - Phony credit event: PS4 writes $01 here on credit bump, but main
+;              CPU doesn't read it
 ;
 ;
 ; Memory map
@@ -418,9 +417,9 @@ F067: BD F6 F1 jsr  $F6F1                    ; Call PROCESS_CREEPER_C80
 F06A: BD F8 99 jsr  $F899                    ; Call PROCESS_CLOCK_ITEM
 F06D: BD F8 D5 jsr  $F8D5                    ; Call PROCESS_CREDITS_MISCHIEF
 F070: BD F8 F1 jsr  $F8F1                    ; Call BUMP_EXTEND
-F073: BD F9 03 jsr  $F903                    ; Call PROCESS_F88
-F076: BD F9 3D jsr  $F93D                    ; Call PROCESS_F8C
-F079: BD F9 77 jsr  $F977                    ; Call PROCESS_F90
+F073: BD F9 03 jsr  $F903                    ; Call PROCESS_TRANSLATOR_F88
+F076: BD F9 3D jsr  $F93D                    ; Call PROCESS_TRANSLATOR_F8C
+F079: BD F9 77 jsr  $F977                    ; Call PROCESS_TRANSLATOR_F90
 F07C: BD F2 99 jsr  $F299                    ; Call LISTEN_FOR_RESET
 
 F07F: CE 0F 96 ldx  #$0F96                   ; Read [$f96]
@@ -924,9 +923,9 @@ F297: 08 38    .byte $08,$38
 
 ;
 ; LISTEN_FOR_RESET:
-; Begins a warm boot of the PS4 if [$f97] == $4a
+; (Called from the main interrupt handler)
 ;
-; A routine called from the main interrupt handler
+; Begins a warm boot of the PS4 if [$f97] == $4a
 ;
 ; It's not obvious why this would be needed: the PS4's reset line is memory-mapped
 ; to the main CPU.
@@ -1147,7 +1146,7 @@ F3E2: 39       rts
 ; intended for, as main CPU never attempts a write to [$c7e], nor a read from
 ; [$c26] (outside of bootup RAM test).
 ;
-; $0054 also seems to be uses in coin/credit processing.
+; $0054 also seems to be used in PROCESS_CREDITS_MISCHIEF.
 ;
 ;
 ; Current [$c7e] value | New [$c26] and $0054 value | New [$c7e] value
@@ -1264,8 +1263,7 @@ F48D: 20 C4    bra  $F453                    ; Common ending
 
 ;
 ; PROCESS_P1_BEASTIES:
-;
-; A routine called from the main interrupt handler
+; (Called from the main interrupt handler)
 ;
 ; This is for player 1. Note that the code in $f585 onwards does player 2,
 ; and is virtually identical.
@@ -1485,8 +1483,7 @@ F582: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
 
 ;
 ; PROCESS_P2_BEASTIES:
-;
-; A routine called from the main interrupt handler
+; (Called from the main interrupt handler)
 ;
 ; This is for player 2. Note that the code in $f48f onwards does player 1,
 ; and is virtually identical, the only differences being a few of the pointers
@@ -1496,130 +1493,130 @@ F582: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
 ;
 
 F585: CE 0C 67 ldx  #$0C67                   ; Was [$c5f] for P1
-F588: BD F1 BF jsr  $F1BF                    ; (see routine at $f48f)
-F58B: C4 01    andb #$01                     ; (see routine at $f48f)
-F58D: C1 01    cmpb #$01                     ; (see routine at $f48f)
-F58F: 27 01    beq  $F592                    ; (see routine at $f48f)
-F591: 39       rts                           ; (see routine at $f48f)
-F592: 7F 00 57 clr  $0057                    ; (see routine at $f48f)
+F588: BD F1 BF jsr  $F1BF                    ; (See routine at $f48f)
+F58B: C4 01    andb #$01                     ; (See routine at $f48f)
+F58D: C1 01    cmpb #$01                     ; (See routine at $f48f)
+F58F: 27 01    beq  $F592                    ; (See routine at $f48f)
+F591: 39       rts                           ; (See routine at $f48f)
+F592: 7F 00 57 clr  $0057                    ; (See routine at $f48f)
 F595: CE 0C 68 ldx  #$0C68                   ; Was [$c60] for P1
-F598: BD F1 BF jsr  $F1BF                    ; (see routine at $f48f)
-F59B: F7 00 55 stb  $0055                    ; (see routine at $f48f)
+F598: BD F1 BF jsr  $F1BF                    ; (See routine at $f48f)
+F59B: F7 00 55 stb  $0055                    ; (See routine at $f48f)
 F59E: CE 0C 69 ldx  #$0C69                   ; Was [$c61] for P1
-F5A1: BD F1 BF jsr  $F1BF                    ; (see routine at $f48f)
-F5A4: F7 00 56 stb  $0056                    ; (see routine at $f48f)
-F5A7: CC 0C 01 ldd  #$0C01                   ; (see routine at $f48f)
-F5AA: FD 00 58 std  $0058                    ; (see routine at $f48f)
-F5AD: CC 0C 27 ldd  #$0C27                   ; (see routine at $f48f)
-F5B0: FD 00 5A std  $005A                    ; (see routine at $f48f)
-F5B3: 7F 00 5C clr  $005C                    ; (see routine at $f48f)
-F5B6: FE 00 58 ldx  $0058                    ; (see routine at $f48f)
-F5B9: BD F1 BF jsr  $F1BF                    ; (see routine at $f48f)
-F5BC: C4 01    andb #$01                     ; (see routine at $f48f)
-F5BE: C1 01    cmpb #$01                     ; (see routine at $f48f)
-F5C0: 27 03    beq  $F5C5                    ; (see routine at $f48f)
-F5C2: 7E F6 37 jmp  $F637                    ; (see routine at $f48f)
-F5C5: FE 00 58 ldx  $0058                    ; (see routine at $f48f)
-F5C8: 08       inx                           ; (see routine at $f48f)
-F5C9: BD F1 BF jsr  $F1BF                    ; (see routine at $f48f)
-F5CC: B6 00 55 lda  $0055                    ; (see routine at $f48f)
-F5CF: 10       sba                           ; (see routine at $f48f)
-F5D0: 27 0B    beq  $F5DD                    ; (see routine at $f48f)
-F5D2: 24 05    bcc  $F5D9                    ; (see routine at $f48f)
-F5D4: C6 01    ldb  #$01                     ; (see routine at $f48f)
-F5D6: 40       nega                          ; (see routine at $f48f)
-F5D7: 20 06    bra  $F5DF                    ; (see routine at $f48f)
-F5D9: C6 00    ldb  #$00                     ; (see routine at $f48f)
-F5DB: 20 02    bra  $F5DF                    ; (see routine at $f48f)
-F5DD: C6 80    ldb  #$80                     ; (see routine at $f48f)
-F5DF: FE 00 5A ldx  $005A                    ; (see routine at $f48f)
+F5A1: BD F1 BF jsr  $F1BF                    ; (See routine at $f48f)
+F5A4: F7 00 56 stb  $0056                    ; (See routine at $f48f)
+F5A7: CC 0C 01 ldd  #$0C01                   ; (See routine at $f48f)
+F5AA: FD 00 58 std  $0058                    ; (See routine at $f48f)
+F5AD: CC 0C 27 ldd  #$0C27                   ; (See routine at $f48f)
+F5B0: FD 00 5A std  $005A                    ; (See routine at $f48f)
+F5B3: 7F 00 5C clr  $005C                    ; (See routine at $f48f)
+F5B6: FE 00 58 ldx  $0058                    ; (See routine at $f48f)
+F5B9: BD F1 BF jsr  $F1BF                    ; (See routine at $f48f)
+F5BC: C4 01    andb #$01                     ; (See routine at $f48f)
+F5BE: C1 01    cmpb #$01                     ; (See routine at $f48f)
+F5C0: 27 03    beq  $F5C5                    ; (See routine at $f48f)
+F5C2: 7E F6 37 jmp  $F637                    ; (See routine at $f48f)
+F5C5: FE 00 58 ldx  $0058                    ; (See routine at $f48f)
+F5C8: 08       inx                           ; (See routine at $f48f)
+F5C9: BD F1 BF jsr  $F1BF                    ; (See routine at $f48f)
+F5CC: B6 00 55 lda  $0055                    ; (See routine at $f48f)
+F5CF: 10       sba                           ; (See routine at $f48f)
+F5D0: 27 0B    beq  $F5DD                    ; (See routine at $f48f)
+F5D2: 24 05    bcc  $F5D9                    ; (See routine at $f48f)
+F5D4: C6 01    ldb  #$01                     ; (See routine at $f48f)
+F5D6: 40       nega                          ; (See routine at $f48f)
+F5D7: 20 06    bra  $F5DF                    ; (See routine at $f48f)
+F5D9: C6 00    ldb  #$00                     ; (See routine at $f48f)
+F5DB: 20 02    bra  $F5DF                    ; (See routine at $f48f)
+F5DD: C6 80    ldb  #$80                     ; (See routine at $f48f)
+F5DF: FE 00 5A ldx  $005A                    ; (See routine at $f48f)
 F5E2: 08       inx                           ; Not present for P1
-F5E3: 36       psha                          ; (see routine at $f48f)
-F5E4: BD F1 DB jsr  $F1DB                    ; (see routine at $f48f)
-F5E7: FE 00 5A ldx  $005A                    ; (see routine at $f48f)
-F5EA: 08       inx                           ; (see routine at $f48f)
-F5EB: 08       inx                           ; (see routine at $f48f)
-F5EC: 08       inx                           ; (see routine at $f48f)
-F5ED: 08       inx                           ; (see routine at $f48f)
+F5E3: 36       psha                          ; (See routine at $f48f)
+F5E4: BD F1 DB jsr  $F1DB                    ; (See routine at $f48f)
+F5E7: FE 00 5A ldx  $005A                    ; (See routine at $f48f)
+F5EA: 08       inx                           ; (See routine at $f48f)
+F5EB: 08       inx                           ; (See routine at $f48f)
+F5EC: 08       inx                           ; (See routine at $f48f)
+F5ED: 08       inx                           ; (See routine at $f48f)
 F5EE: 08       inx                           ; Not present for P1
-F5EF: 32       pula                          ; (see routine at $f48f)
-F5F0: 36       psha                          ; (see routine at $f48f)
-F5F1: 16       tab                           ; (see routine at $f48f)
-F5F2: BD F1 DB jsr  $F1DB                    ; (see routine at $f48f)
-F5F5: 32       pula                          ; (see routine at $f48f)
-F5F6: 81 08    cmpa #$08                     ; (see routine at $f48f)
-F5F8: 24 03    bcc  $F5FD                    ; (see routine at $f48f)
-F5FA: 7C 00 5C inc  $005C                    ; (see routine at $f48f)
-F5FD: FE 00 58 ldx  $0058                    ; (see routine at $f48f)
-F600: 08       inx                           ; (see routine at $f48f)
-F601: 08       inx                           ; (see routine at $f48f)
-F602: BD F1 BF jsr  $F1BF                    ; (see routine at $f48f)
-F605: B6 00 56 lda  $0056                    ; (see routine at $f48f)
-F608: 10       sba                           ; (see routine at $f48f)
-F609: 27 0B    beq  $F616                    ; (see routine at $f48f)
-F60B: 24 05    bcc  $F612                    ; (see routine at $f48f)
-F60D: C6 01    ldb  #$01                     ; (see routine at $f48f)
-F60F: 40       nega                          ; (see routine at $f48f)
-F610: 20 06    bra  $F618                    ; (see routine at $f48f)
-F612: C6 00    ldb  #$00                     ; (see routine at $f48f)
-F614: 20 02    bra  $F618                    ; (see routine at $f48f)
-F616: C6 80    ldb  #$80                     ; (see routine at $f48f)
-F618: FE 00 5A ldx  $005A                    ; (see routine at $f48f)
-F61B: 08       inx                           ; (see routine at $f48f)
-F61C: 08       inx                           ; (see routine at $f48f)
+F5EF: 32       pula                          ; (See routine at $f48f)
+F5F0: 36       psha                          ; (See routine at $f48f)
+F5F1: 16       tab                           ; (See routine at $f48f)
+F5F2: BD F1 DB jsr  $F1DB                    ; (See routine at $f48f)
+F5F5: 32       pula                          ; (See routine at $f48f)
+F5F6: 81 08    cmpa #$08                     ; (See routine at $f48f)
+F5F8: 24 03    bcc  $F5FD                    ; (See routine at $f48f)
+F5FA: 7C 00 5C inc  $005C                    ; (See routine at $f48f)
+F5FD: FE 00 58 ldx  $0058                    ; (See routine at $f48f)
+F600: 08       inx                           ; (See routine at $f48f)
+F601: 08       inx                           ; (See routine at $f48f)
+F602: BD F1 BF jsr  $F1BF                    ; (See routine at $f48f)
+F605: B6 00 56 lda  $0056                    ; (See routine at $f48f)
+F608: 10       sba                           ; (See routine at $f48f)
+F609: 27 0B    beq  $F616                    ; (See routine at $f48f)
+F60B: 24 05    bcc  $F612                    ; (See routine at $f48f)
+F60D: C6 01    ldb  #$01                     ; (See routine at $f48f)
+F60F: 40       nega                          ; (See routine at $f48f)
+F610: 20 06    bra  $F618                    ; (See routine at $f48f)
+F612: C6 00    ldb  #$00                     ; (See routine at $f48f)
+F614: 20 02    bra  $F618                    ; (See routine at $f48f)
+F616: C6 80    ldb  #$80                     ; (See routine at $f48f)
+F618: FE 00 5A ldx  $005A                    ; (See routine at $f48f)
+F61B: 08       inx                           ; (See routine at $f48f)
+F61C: 08       inx                           ; (See routine at $f48f)
 F61D: 08       inx                           ; Not present for P1
-F61E: 36       psha                          ; (see routine at $f48f)
-F61F: BD F1 DB jsr  $F1DB                    ; (see routine at $f48f)
-F622: FE 00 5A ldx  $005A                    ; (see routine at $f48f)
-F625: 08       inx                           ; (see routine at $f48f)
-F626: 08       inx                           ; (see routine at $f48f)
-F627: 08       inx                           ; (see routine at $f48f)
-F628: 08       inx                           ; (see routine at $f48f)
-F629: 08       inx                           ; (see routine at $f48f)
-F62A: 08       inx                           ; (see routine at $f48f)
+F61E: 36       psha                          ; (See routine at $f48f)
+F61F: BD F1 DB jsr  $F1DB                    ; (See routine at $f48f)
+F622: FE 00 5A ldx  $005A                    ; (See routine at $f48f)
+F625: 08       inx                           ; (See routine at $f48f)
+F626: 08       inx                           ; (See routine at $f48f)
+F627: 08       inx                           ; (See routine at $f48f)
+F628: 08       inx                           ; (See routine at $f48f)
+F629: 08       inx                           ; (See routine at $f48f)
+F62A: 08       inx                           ; (See routine at $f48f)
 F62B: 08       inx                           ; Not present for P1
-F62C: 32       pula                          ; (see routine at $f48f)
-F62D: 36       psha                          ; (see routine at $f48f)
-F62E: 16       tab                           ; (see routine at $f48f)
-F62F: BD F1 DB jsr  $F1DB                    ; (see routine at $f48f)
-F632: 32       pula                          ; (see routine at $f48f)
-F633: 81 08    cmpa #$08                     ; (see routine at $f48f)
-F635: 25 26    bcs  $F65D                    ; (see routine at $f48f)
-F637: FE 00 58 ldx  $0058                    ; (see routine at $f48f)
-F63A: 08       inx                           ; (see routine at $f48f)
-F63B: 08       inx                           ; (see routine at $f48f)
-F63C: 08       inx                           ; (see routine at $f48f)
-F63D: 08       inx                           ; (see routine at $f48f)
-F63E: FF 00 58 stx  $0058                    ; (see routine at $f48f)
-F641: FE 00 5A ldx  $005A                    ; (see routine at $f48f)
-F644: 08       inx                           ; (see routine at $f48f)
-F645: 08       inx                           ; (see routine at $f48f)
-F646: 08       inx                           ; (see routine at $f48f)
-F647: 08       inx                           ; (see routine at $f48f)
-F648: 08       inx                           ; (see routine at $f48f)
-F649: 08       inx                           ; (see routine at $f48f)
+F62C: 32       pula                          ; (See routine at $f48f)
+F62D: 36       psha                          ; (See routine at $f48f)
+F62E: 16       tab                           ; (See routine at $f48f)
+F62F: BD F1 DB jsr  $F1DB                    ; (See routine at $f48f)
+F632: 32       pula                          ; (See routine at $f48f)
+F633: 81 08    cmpa #$08                     ; (See routine at $f48f)
+F635: 25 26    bcs  $F65D                    ; (See routine at $f48f)
+F637: FE 00 58 ldx  $0058                    ; (See routine at $f48f)
+F63A: 08       inx                           ; (See routine at $f48f)
+F63B: 08       inx                           ; (See routine at $f48f)
+F63C: 08       inx                           ; (See routine at $f48f)
+F63D: 08       inx                           ; (See routine at $f48f)
+F63E: FF 00 58 stx  $0058                    ; (See routine at $f48f)
+F641: FE 00 5A ldx  $005A                    ; (See routine at $f48f)
+F644: 08       inx                           ; (See routine at $f48f)
+F645: 08       inx                           ; (See routine at $f48f)
+F646: 08       inx                           ; (See routine at $f48f)
+F647: 08       inx                           ; (See routine at $f48f)
+F648: 08       inx                           ; (See routine at $f48f)
+F649: 08       inx                           ; (See routine at $f48f)
 F64A: 08       inx                           ; Not present for P1
 F64B: 08       inx                           ; Not present for P1
-F64C: FF 00 5A stx  $005A                    ; (see routine at $f48f)
-F64F: 7C 00 57 inc  $0057                    ; (see routine at $f48f)
-F652: B6 00 57 lda  $0057                    ; (see routine at $f48f)
-F655: 81 07    cmpa #$07                     ; (see routine at $f48f)
-F657: 27 03    beq  $F65C                    ; (see routine at $f48f)
-F659: 7E F5 B6 jmp  $F5B6                    ; (see routine at $f48f)
-F65C: 39       rts                           ; (see routine at $f48f)
-F65D: 7D 00 5C tst  $005C                    ; (see routine at $f48f)
-F660: 27 FA    beq  $F65C                    ; (see routine at $f48f)
-F662: CE 0C 67 ldx  #$0C67                   ; (see routine at $f48f)
-F665: BD F1 BF jsr  $F1BF                    ; (see routine at $f48f)
-F668: C4 01    andb #$01                     ; (see routine at $f48f)
-F66A: C1 01    cmpb #$01                     ; (see routine at $f48f)
-F66C: 26 EE    bne  $F65C                    ; (see routine at $f48f)
-F66E: CE 0C 6A ldx  #$0C6A                   ; (see routine at $f48f)
-F671: C6 01    ldb  #$01                     ; (see routine at $f48f)
-F673: BD F1 DB jsr  $F1DB                    ; (see routine at $f48f)
-F676: F6 00 57 ldb  $0057                    ; (see routine at $f48f)
-F679: CE 0C 6B ldx  #$0C6B                   ; (see routine at $f48f)
-F67C: 7E F1 DB jmp  $F1DB                    ; (see routine at $f48f)
+F64C: FF 00 5A stx  $005A                    ; (See routine at $f48f)
+F64F: 7C 00 57 inc  $0057                    ; (See routine at $f48f)
+F652: B6 00 57 lda  $0057                    ; (See routine at $f48f)
+F655: 81 07    cmpa #$07                     ; (See routine at $f48f)
+F657: 27 03    beq  $F65C                    ; (See routine at $f48f)
+F659: 7E F5 B6 jmp  $F5B6                    ; (See routine at $f48f)
+F65C: 39       rts                           ; (See routine at $f48f)
+F65D: 7D 00 5C tst  $005C                    ; (See routine at $f48f)
+F660: 27 FA    beq  $F65C                    ; (See routine at $f48f)
+F662: CE 0C 67 ldx  #$0C67                   ; (See routine at $f48f)
+F665: BD F1 BF jsr  $F1BF                    ; (See routine at $f48f)
+F668: C4 01    andb #$01                     ; (See routine at $f48f)
+F66A: C1 01    cmpb #$01                     ; (See routine at $f48f)
+F66C: 26 EE    bne  $F65C                    ; (See routine at $f48f)
+F66E: CE 0C 6A ldx  #$0C6A                   ; (See routine at $f48f)
+F671: C6 01    ldb  #$01                     ; (See routine at $f48f)
+F673: BD F1 DB jsr  $F1DB                    ; (See routine at $f48f)
+F676: F6 00 57 ldb  $0057                    ; (See routine at $f48f)
+F679: CE 0C 6B ldx  #$0C6B                   ; (See routine at $f48f)
+F67C: 7E F1 DB jmp  $F1DB                    ; (See routine at $f48f)
 
 
 ;
@@ -1689,7 +1686,7 @@ F6C8: 7E F1 DB jmp  $F1DB                    ; (See routine at $f6cb)
 ; non-integer rate of work can be achieved on average.
 ;
 ; There are four creepers simulated by the PS4, all of which seem redundant (the
-; main CPU hasn't been seen trying read their results). This one, however, is
+; main CPU hasn't been seen trying to read their results). This one, however, is
 ; at least fed something by the CPU: the current level's wind speed. You'd think
 ; the output would then be used to determine how many iterations of the bubble-
 ; drifting simulation to run for that frame. But no. The main CPU doesn't even
@@ -2225,7 +2222,8 @@ F88E: FF       .byte $FF
 ; Whenever a creeper table is changed, there's a chance that the current creeper
 ; index is already beyond the end of the table. That's usually harmless:
 ; eventually it'll hit an $ff and return to the start. But for the last table,
-; we need enough extra $ff's as padding that no index value could go beyond.
+; we need enough extra $ff's as padding that no index value could have been
+; beyond.
 ;
 F88F: FF       .byte $FF
 F890: FF       .byte $FF
@@ -2241,8 +2239,7 @@ F898: FF       .byte $FF
 
 ;
 ; PROCESS_CLOCK_ITEM:
-;
-; A routine called from the main interrupt handler
+; (Called from the main interrupt handler)
 ;
 ; There's a special item in the game which looks like a clock and pauses time
 ; for the beasties. This routine handles its countdown.
@@ -2313,7 +2310,9 @@ F8F0: 39       rts
 
 ;
 ; BUMP_EXTEND:
-; Reads [$c7c], increments it modulo 6, and writes it back
+; (Called from the main interrupt handler)
+;
+; Reads [$c7c], increments it modulo 6, and writes it back.
 ;
 ; Used to rotate which bubble of EXTEND you'd get if it were to appear right
 ; now.
@@ -2329,125 +2328,190 @@ F900: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
 
 
 ;
-; PROCESS_F88:
+; PROCESS_TRANSLATOR_F88:
 ; (Called from the main interrupt handler)
 ;
+; This is one of three 'translator's that run each frame. Their purpose is to
+; look up a value in an, effectively, 1280-byte block of random data, and to
+; write it in shared RAM at a location which is itself determined by the
+; contents of another location in shared RAM. Here's how it works...
+;
+; Given constants:
+;
+;   - status            = $f88
+;   - index ptr         = $f89
+;   - table ptr         = $f8a
+;   - output offset ptr = $f8b
+;   - output base       = $c88
+;
+; If [status] is $01, then:
+;
+;   - Fetch a table number from [table ptr]
+;   - Fetch a table index from [index ptr]
+;   - Fetch a destination offset from [output offset ptr]
+;   - Locate the internal table with the fetched table number
+;   - Look up the entry in that table for the fetched index
+;   - Write that value to [output base + fetched output offset]
+;   - Write $ff in [status]
+;
+; The fact that the looked-up value is being stored in a specifiable place
+; rather than a fixed one suggests to me that the whole purpose is obfuscation.
+;
+; Kicker: in a playthrough of the game, however, I never saw the main CPU write
+; to [$f88], [$f8c] or [$f90] outside of the RAM self-test, so it appears these
+; were never deployed.
+;
 
-; Return immediately if value of [$f88] isn't 1
+; Return immediately if value of [status] ([$f88] in this case) isn't $01
+;
 F903: CE 0F 88 ldx  #$0F88
 F906: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
 F909: C1 01    cmpb #$01
 F90B: 27 01    beq  $F90E
 F90D: 39       rts  
-; In my playthrough, I never saw [$f88] be 1, so I don't know the circumstances
-; around this
+
+; Fetch the table number from [table ptr] ([$f8a] in this case)
+;
 F90E: CE 0F 8A ldx  #$0F8A
 F911: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F914: CE F9 B1 ldx  #$F9B1                   ; Table pointer -> X
+F914: CE F9 B1 ldx  #$F9B1                   ; Use TRANSLATOR_TABLES as base pointer
 F917: 3A       abx                           ; Add B to it..
 F918: 3A       abx                           ; ..twice, since table entries are 16-bit
 F919: EE 00    ldx  $00,x                    ; Table value -> X
-F91B: 3C       pshx 
+F91B: 3C       pshx                          ; Stash table pointer
+
+; Fetch the index within that table from [index ptr] ([$f89] in this case)
+;
 F91C: CE 0F 89 ldx  #$0F89
 F91F: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F922: 38       pulx 
-F923: 3A       abx  
-F924: E6 00    ldb  $00,x
-F926: 37       pshb 
+F922: 38       pulx                          ; Retrieve stashed table pointer
+F923: 3A       abx                           ; Add index to table base
+F924: E6 00    ldb  $00,x                    ; Read table entry into B
+F926: 37       pshb                          ; Then stash it
+
+; Fetch the output offset from [output offset ptr] ([$f8b] in this case)
+;
 F927: CE 0F 8B ldx  #$0F8B
 F92A: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+
+; Store the looked-up table value in [output base + fetched output offset]
+; ([$c88 + fetched output offset] in this case)
+;
 F92D: CE 0C 88 ldx  #$0C88
 F930: 3A       abx  
 F931: 33       pulb 
 F932: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+
+; Write $ff to [status] ([$f88] in this case), presumably signaling to the main
+; CPU that the processing is done, and preventing this re-running next time
+;
 F935: C6 FF    ldb  #$FF
 F937: CE 0F 88 ldx  #$0F88
 F93A: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
 
 
 ;
-; PROCESS_F8C:
+; PROCESS_TRANSLATOR_F8C:
 ; (Called from the main interrupt handler)
 ;
-; Looks like a second copy of $f903, with different constants
+; This is a translator (see PROCESS_TRANSLATOR_F88) with constants:
+;
+;   - status            = $f8c
+;   - index ptr         = $f8d
+;   - table ptr         = $f8e
+;   - output offset ptr = $f8f
+;   - output base       = $d88
 ;
 
-F93D: CE 0F 8C ldx  #$0F8C
-F940: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F943: C1 01    cmpb #$01
-F945: 27 01    beq  $F948
-F947: 39       rts  
-F948: CE 0F 8E ldx  #$0F8E
-F94B: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F94E: CE F9 B1 ldx  #$F9B1
-F951: 3A       abx  
-F952: 3A       abx  
-F953: EE 00    ldx  $00,x
-F955: 3C       pshx 
-F956: CE 0F 8D ldx  #$0F8D
-F959: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F95C: 38       pulx 
-F95D: 3A       abx  
-F95E: E6 00    ldb  $00,x
-F960: 37       pshb 
-F961: CE 0F 8F ldx  #$0F8F
-F964: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F967: CE 0D 88 ldx  #$0D88
-F96A: 3A       abx  
-F96B: 33       pulb 
-F96C: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
-F96F: C6 FF    ldb  #$FF
-F971: CE 0F 8C ldx  #$0F8C
-F974: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
+F93D: CE 0F 8C ldx  #$0F8C                   ; (See routine at $f903)
+F940: BD F1 BF jsr  $F1BF                    ; (See routine at $f903)
+F943: C1 01    cmpb #$01                     ; (See routine at $f903)
+F945: 27 01    beq  $F948                    ; (See routine at $f903)
+F947: 39       rts                           ; (See routine at $f903)
+F948: CE 0F 8E ldx  #$0F8E                   ; (See routine at $f903)
+F94B: BD F1 BF jsr  $F1BF                    ; (See routine at $f903)
+F94E: CE F9 B1 ldx  #$F9B1                   ; (See routine at $f903)
+F951: 3A       abx                           ; (See routine at $f903)
+F952: 3A       abx                           ; (See routine at $f903)
+F953: EE 00    ldx  $00,x                    ; (See routine at $f903)
+F955: 3C       pshx                          ; (See routine at $f903)
+F956: CE 0F 8D ldx  #$0F8D                   ; (See routine at $f903)
+F959: BD F1 BF jsr  $F1BF                    ; (See routine at $f903)
+F95C: 38       pulx                          ; (See routine at $f903)
+F95D: 3A       abx                           ; (See routine at $f903)
+F95E: E6 00    ldb  $00,x                    ; (See routine at $f903)
+F960: 37       pshb                          ; (See routine at $f903)
+F961: CE 0F 8F ldx  #$0F8F                   ; (See routine at $f903)
+F964: BD F1 BF jsr  $F1BF                    ; (See routine at $f903)
+F967: CE 0D 88 ldx  #$0D88                   ; (See routine at $f903)
+F96A: 3A       abx                           ; (See routine at $f903)
+F96B: 33       pulb                          ; (See routine at $f903)
+F96C: BD F1 DB jsr  $F1DB                    ; (See routine at $f903)
+F96F: C6 FF    ldb  #$FF                     ; (See routine at $f903)
+F971: CE 0F 8C ldx  #$0F8C                   ; (See routine at $f903)
+F974: 7E F1 DB jmp  $F1DB                    ; (See routine at $f903)
 
 
 ;
-; PROCESS_F90:
+; PROCESS_TRANSLATOR_F90:
 ; (Called from the main interrupt handler)
 ;
-; Looks like a third copy of $f903, with different constants
+; This is a translator (see PROCESS_TRANSLATOR_F88) with constants:
+;
+;   - status            = $f90
+;   - index ptr         = $f91
+;   - table ptr         = $f92
+;   - output offset ptr = $f93
+;   - output base       = $e88
 ;
 
-F977: CE 0F 90 ldx  #$0F90
-F97A: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F97D: C1 01    cmpb #$01
-F97F: 27 01    beq  $F982
-F981: 39       rts  
-F982: CE 0F 92 ldx  #$0F92
-F985: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F988: CE F9 B1 ldx  #$F9B1
-F98B: 3A       abx  
-F98C: 3A       abx  
-F98D: EE 00    ldx  $00,x
-F98F: 3C       pshx 
-F990: CE 0F 91 ldx  #$0F91
-F993: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F996: 38       pulx 
-F997: 3A       abx  
-F998: E6 00    ldb  $00,x
-F99A: 37       pshb 
-F99B: CE 0F 93 ldx  #$0F93
-F99E: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F9A1: CE 0E 88 ldx  #$0E88
-F9A4: 3A       abx  
-F9A5: 33       pulb 
-F9A6: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
-F9A9: C6 FF    ldb  #$FF
-F9AB: CE 0F 90 ldx  #$0F90
-F9AE: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
+F977: CE 0F 90 ldx  #$0F90                   ; (See routine at $f903)
+F97A: BD F1 BF jsr  $F1BF                    ; (See routine at $f903)
+F97D: C1 01    cmpb #$01                     ; (See routine at $f903)
+F97F: 27 01    beq  $F982                    ; (See routine at $f903)
+F981: 39       rts                           ; (See routine at $f903)
+F982: CE 0F 92 ldx  #$0F92                   ; (See routine at $f903)
+F985: BD F1 BF jsr  $F1BF                    ; (See routine at $f903)
+F988: CE F9 B1 ldx  #$F9B1                   ; (See routine at $f903)
+F98B: 3A       abx                           ; (See routine at $f903)
+F98C: 3A       abx                           ; (See routine at $f903)
+F98D: EE 00    ldx  $00,x                    ; (See routine at $f903)
+F98F: 3C       pshx                          ; (See routine at $f903)
+F990: CE 0F 91 ldx  #$0F91                   ; (See routine at $f903)
+F993: BD F1 BF jsr  $F1BF                    ; (See routine at $f903)
+F996: 38       pulx                          ; (See routine at $f903)
+F997: 3A       abx                           ; (See routine at $f903)
+F998: E6 00    ldb  $00,x                    ; (See routine at $f903)
+F99A: 37       pshb                          ; (See routine at $f903)
+F99B: CE 0F 93 ldx  #$0F93                   ; (See routine at $f903)
+F99E: BD F1 BF jsr  $F1BF                    ; (See routine at $f903)
+F9A1: CE 0E 88 ldx  #$0E88                   ; (See routine at $f903)
+F9A4: 3A       abx                           ; (See routine at $f903)
+F9A5: 33       pulb                          ; (See routine at $f903)
+F9A6: BD F1 DB jsr  $F1DB                    ; (See routine at $f903)
+F9A9: C6 FF    ldb  #$FF                     ; (See routine at $f903)
+F9AB: CE 0F 90 ldx  #$0F90                   ; (See routine at $f903)
+F9AE: 7E F1 DB jmp  $F1DB                    ; (See routine at $f903)
 
 
 ;
-; This is a table, accessed in $f914, $f94e and $f988. It seems to point to
-; other tables. I don't yet know why.
+; TRANSLATOR_TABLES:
 ;
-F9B1: F9 BB    .word $F9BB
-F9B3: FA BB    .word $FABB
-F9B5: FB BB    .word $FBBB
-F9B7: FC BB    .word $FCBB
-F9B9: FD BB    .word $FDBB
+; Five tables of seemingly random bytes, presumably intended to make some PS4
+; outputs unguessable.
+;
+; Each table is not a derangement of the 256 possible byte values. However,
+; all values can be seen at least once somewhere within the five tables.
+;
 
-; Table pointed to from the table entry at $f9b1
+F9B1: F9 BB    .word $F9BB                   ; TRANSLATOR_TABLE_0
+F9B3: FA BB    .word $FABB                   ; TRANSLATOR_TABLE_1
+F9B5: FB BB    .word $FBBB                   ; TRANSLATOR_TABLE_2
+F9B7: FC BB    .word $FCBB                   ; TRANSLATOR_TABLE_3
+F9B9: FD BB    .word $FDBB                   ; TRANSLATOR_TABLE_4
+
+; TRANSLATOR_TABLE_0
+;
 F9BB: 17 3A    .byte $17,$3A
 F9BD: 51 E0    .byte $51,$E0
 F9BF: FE C3    .byte $FE,$C3
@@ -2577,7 +2641,7 @@ FAB5: 1A 1B    .byte $1A,$1B
 FAB7: E6 0F    .byte $E6,$0F
 FAB9: B0 23    .byte $B0,$23
 
-; Table pointed to from the table entry at $f9b3
+; TRANSLATOR_TABLE_1:
 FABB: 77 2B    .byte $77,$2B
 FABD: C9 C5    .byte $C9,$C5
 FABF: 70 1A    .byte $70,$1A
@@ -2707,7 +2771,7 @@ FBB5: 7B 07    .byte $7B,$07
 FBB7: CD D5    .byte $CD,$D5
 FBB9: 09 C9    .byte $09,$C9
 
-; Table pointed to from the table entry at $f9b5
+; TRANSLATOR_TABLE_2:
 FBBB: 36 02    .byte $36,$02
 FBBD: 23 5E    .byte $23,$5E
 FBBF: 23 56    .byte $23,$56
@@ -2837,7 +2901,7 @@ FCB5: 0C C9    .byte $0C,$C9
 FCB7: 03 0A    .byte $03,$0A
 FCB9: E6 C0    .byte $E6,$C0
 
-; Table pointed to from the table entry at $f9b7
+; TRANSLATOR_TABLE_3
 FCBB: C8 0A    .byte $C8,$0A
 FCBD: E6 F0    .byte $E6,$F0
 FCBF: D6 40    .byte $D6,$40
@@ -2967,7 +3031,7 @@ FDB5: CB B9    .byte $CB,$B9
 FDB7: CE 11    .byte $CE,$11
 FDB9: 00 48    .byte $00,$48
 
-; Table pointed to from the table entry at $f9b9
+; TRANSLATOR_TABLE_4
 FDBB: C9 E6    .byte $C9,$E6
 FDBD: 07 F6    .byte $07,$F6
 FDBF: 08 DD    .byte $08,$DD
@@ -3101,16 +3165,18 @@ FEB9: 03 0A    .byte $03,$0A
 ;
 ; CONFIGURE_MCU:
 ;
-; Bulk of the cold start routine, jumped to immediately from the actual start
-; of the cold start handler ($f000). It's concerned with configuring the ports
-; and features of the microcontroller.
+; Bulk of the cold start routine, jumped to immediately from the actual start of
+; the cold start handler ($f000). It's concerned with configuring the ports and
+; features of the microcontroller.
 ;
+
 FEBB: 8E 00 FF lds  #$00FF
 FEBE: 0F       sei  
 FEBF: 86 AF    lda  #$AF
 FEC1: 97 0F    sta  $0F
 
 ; Initialize timers, serial port
+;
 FEC3: 7F 00 08 clr  $0008                    ; Reset timer control and status register
 FEC6: 7F 00 17 clr  $0017                    ; Reset timer control register 1
 FEC9: 7F 00 18 clr  $0018                    ; Reset timer control register 2
@@ -3176,7 +3242,6 @@ FF37: 97 07    sta  $07                      ; Port 4 data register
 FF39: 97 06    sta  $06                      ; Port 3 data register
 FF3B: 20 03    bra  $FF40
 
-;
 ; This is the success point, where we can return to the main setup
 ;
 FF3D: 7E F0 03 jmp  $F003                    ; Return to boot sequence at $f003
