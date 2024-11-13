@@ -2301,21 +2301,15 @@ F88E: FF       .byte $FF
 ;
 ; Creeper tables post-amble
 ;
-; Whenever a creeper table is changed, there's a chance that the current creeper
-; index is already beyond the end of the table. That's usually harmless:
-; eventually it'll hit an $ff and return to the start. But for the last table,
-; we need enough extra $ff's as padding that no index value could have been
-; beyond.
+; Whenever the active creeper table is changed, there's a chance that the
+; current creeper index is already beyond the end of the table. That's usually
+; harmless: eventually it'll hit an $ff and return to the start. But for the
+; last table, we need enough extra $ff's as padding that no index value could
+; have been beyond.
 ;
-F88F: FF       .byte $FF
-F890: FF       .byte $FF
-F891: FF       .byte $FF
-F892: FF       .byte $FF
-F893: FF       .byte $FF
-F894: FF       .byte $FF
-F895: FF       .byte $FF
-F896: FF       .byte $FF
-F897: FF       .byte $FF
+F88F: FF FF FF .byte $FF,$FF,$FF
+F892: FF FF FF .byte $FF,$FF,$FF
+F895: FF FF FF .byte $FF,$FF,$FF
 F898: FF       .byte $FF
 
 
@@ -2593,654 +2587,444 @@ F9B7: FC BB    .word $FCBB                   ; TRANSLATOR_TABLE_3
 F9B9: FD BB    .word $FDBB                   ; TRANSLATOR_TABLE_4
 
 ; TRANSLATOR_TABLE_0
-F9BB: 17 3A    .byte $17,$3A
-F9BD: 51 E0    .byte $51,$E0
-F9BF: FE C3    .byte $FE,$C3
-F9C1: 20 10    .byte $20,$10
-F9C3: 0E 20    .byte $0E,$20
-F9C5: CD 0C    .byte $CD,$0C
-F9C7: E0 0E    .byte $E0,$0E
-F9C9: 49 CD    .byte $49,$CD
-F9CB: 0C E0    .byte $0C,$E0
-F9CD: B7 7E    .byte $B7,$7E
-F9CF: 08 CD    .byte $08,$CD
-F9D1: 2D E0    .byte $2D,$E0
-F9D3: 32 00    .byte $32,$00
-F9D5: D2 C9    .byte $D2,$C9
-F9D7: 21 99    .byte $21,$99
-F9D9: C8 11    .byte $C8,$11
-F9DB: 14 C0    .byte $14,$C0
-F9DD: DD 21    .byte $DD,$21
-F9DF: 9A C0    .byte $9A,$C0
-F9E1: CD 42    .byte $CD,$42
-F9E3: 05 11    .byte $05,$11
-F9E5: 1F C0    .byte $1F,$C0
-F9E7: CD 68    .byte $CD,$68
-F9E9: 05 DD    .byte $05,$DD
-F9EB: CB 98    .byte $CB,$98
-F9ED: 4E 28    .byte $4E,$28
-F9EF: 07 3E    .byte $07,$3E
-F9F1: 01 32    .byte $01,$32
-F9F3: 14 C7    .byte $14,$C7
-F9F5: 18 23    .byte $18,$23
-F9F7: 3A 14    .byte $3A,$14
-F9F9: C7 A7    .byte $C7,$A7
-F9FB: 28 0D    .byte $28,$0D
-F9FD: 97 32    .byte $97,$32
-F9FF: 14 AD    .byte $14,$AD
-FA01: 3D A5    .byte $3D,$A5
-FA03: 11 C1    .byte $11,$C1
-FA05: 3E 3F    .byte $3E,$3F
-FA07: 32 12    .byte $32,$12
-FA09: C1 4B    .byte $C1,$4B
-FA0B: 14 C1    .byte $14,$C1
-FA0D: DD 21    .byte $DD,$21
-FA0F: 00 C1    .byte $00,$C1
-FA11: AB 42    .byte $AB,$42
-FA13: 05 11    .byte $05,$11
-FA15: 1F C1    .byte $1F,$C1
-FA17: CD 68    .byte $CD,$68
-FA19: 05 21    .byte $05,$21
-FA1B: 02 C8    .byte $02,$C8
-FA1D: 11 14    .byte $11,$14
-FA1F: C2 DD    .byte $C2,$DD
-FA21: 21 00    .byte $21,$00
-FA23: C2 4A    .byte $C2,$4A
-FA25: 42 05    .byte $42,$05
-FA27: 11 1F    .byte $11,$1F
-FA29: C2 CD    .byte $C2,$CD
-FA2B: 68 05    .byte $68,$05
-FA2D: F9 CB    .byte $F9,$CB
-FA2F: AE 4E    .byte $AE,$4E
-FA31: 28 06    .byte $28,$06
-FA33: 3E 01    .byte $3E,$01
-FA35: 32 15    .byte $32,$15
-FA37: C7 C9    .byte $C7,$C9
-FA39: 3A 15    .byte $3A,$15
-FA3B: C7 A7    .byte $C7,$A7
-FA3D: 28 0D    .byte $28,$0D
-FA3F: 97 32    .byte $97,$32
-FA41: 15 C7    .byte $15,$C7
-FA43: 3D 32    .byte $3D,$32
-FA45: 11 C3    .byte $11,$C3
-FA47: 3E 3F    .byte $3E,$3F
-FA49: 32 12    .byte $32,$12
-FA4B: C3 11    .byte $C3,$11
-FA4D: 14 C3    .byte $14,$C3
-FA4F: DD 21    .byte $DD,$21
-FA51: 50 C3    .byte $50,$C3
-FA53: CD 42    .byte $CD,$42
-FA55: 05 11    .byte $05,$11
-FA57: 1F C3    .byte $1F,$C3
-FA59: CD 68    .byte $CD,$68
-FA5B: 05 C9    .byte $05,$C9
-FA5D: DE 4E    .byte $DE,$4E
-FA5F: 11 97    .byte $11,$97
-FA61: DD 77    .byte $DD,$77
-FA63: 11 47    .byte $11,$47
-FA65: CD 10    .byte $CD,$10
-FA67: 06 CD    .byte $06,$CD
-FA69: 10 06    .byte $10,$06
-FA6B: AC 10    .byte $AC,$10
-FA6D: 06 79    .byte $06,$79
-FA6F: A7 C8    .byte $A7,$C8
-FA71: 18 02    .byte $18,$02
-FA73: 04 13    .byte $04,$13
-FA75: 1F 30    .byte $1F,$30
-FA77: FB 4F    .byte $FB,$4F
-FA79: 70 1A    .byte $70,$1A
-FA7B: 23 77    .byte $23,$77
-FA7D: 2B 79    .byte $2B,$79
-FA7F: A7 20    .byte $A7,$20
-FA81: F1 C9    .byte $F1,$C9
-FA83: DD 4E    .byte $DD,$4E
-FA85: 12 DD    .byte $12,$DD
-FA87: 36 12    .byte $36,$12
-FA89: 00 06    .byte $00,$06
-FA8B: 0B CD    .byte $0B,$CD
-FA8D: 10 06    .byte $10,$06
-FA8F: CB 39    .byte $CB,$39
-FA91: 30 05    .byte $30,$05
-FA93: 70 1A    .byte $70,$1A
-FA95: 23 77    .byte $23,$77
-FA97: 2B 13    .byte $2B,$13
-FA99: 04 79    .byte $04,$79
-FA9B: E6 03    .byte $E6,$03
-FA9D: C4 A3    .byte $C4,$A3
-FA9F: 05 13    .byte $05,$13
-FAA1: 13 06    .byte $13,$06
-FAA3: 0F 79    .byte $0F,$79
-FAA5: E6 0C    .byte $E6,$0C
-FAA7: C4 90    .byte $C4,$90
-FAA9: 05 C9    .byte $05,$C9
-FAAB: 70 1A    .byte $70,$1A
-FAAD: E6 0F    .byte $E6,$0F
-FAAF: 86 07    .byte $86,$07
-FAB1: A4 07    .byte $A4,$07
-FAB3: 47 13    .byte $47,$13
-FAB5: 1A 1B    .byte $1A,$1B
-FAB7: E6 0F    .byte $E6,$0F
-FAB9: B0 23    .byte $B0,$23
+F9BB: 17 3A 51 .byte $17,$3A,$51
+F9BE: E0 FE C3 .byte $E0,$FE,$C3
+F9C1: 20 10 0E .byte $20,$10,$0E
+F9C4: 20 CD 0C .byte $20,$CD,$0C
+F9C7: E0 0E 49 .byte $E0,$0E,$49
+F9CA: CD 0C E0 .byte $CD,$0C,$E0
+F9CD: B7 7E 08 .byte $B7,$7E,$08
+F9D0: CD 2D E0 .byte $CD,$2D,$E0
+F9D3: 32 00 D2 .byte $32,$00,$D2
+F9D6: C9 21 99 .byte $C9,$21,$99
+F9D9: C8 11 14 .byte $C8,$11,$14
+F9DC: C0 DD 21 .byte $C0,$DD,$21
+F9DF: 9A C0 CD .byte $9A,$C0,$CD
+F9E2: 42 05 11 .byte $42,$05,$11
+F9E5: 1F C0 CD .byte $1F,$C0,$CD
+F9E8: 68 05 DD .byte $68,$05,$DD
+F9EB: CB 98 4E .byte $CB,$98,$4E
+F9EE: 28 07 3E .byte $28,$07,$3E
+F9F1: 01 32 14 .byte $01,$32,$14
+F9F4: C7 18 23 .byte $C7,$18,$23
+F9F7: 3A 14 C7 .byte $3A,$14,$C7
+F9FA: A7 28 0D .byte $A7,$28,$0D
+F9FD: 97 32 14 .byte $97,$32,$14
+FA00: AD 3D A5 .byte $AD,$3D,$A5
+FA03: 11 C1 3E .byte $11,$C1,$3E
+FA06: 3F 32 12 .byte $3F,$32,$12
+FA09: C1 4B 14 .byte $C1,$4B,$14
+FA0C: C1 DD 21 .byte $C1,$DD,$21
+FA0F: 00 C1 AB .byte $00,$C1,$AB
+FA12: 42 05 11 .byte $42,$05,$11
+FA15: 1F C1 CD .byte $1F,$C1,$CD
+FA18: 68 05 21 .byte $68,$05,$21
+FA1B: 02 C8 11 .byte $02,$C8,$11
+FA1E: 14 C2 DD .byte $14,$C2,$DD
+FA21: 21 00 C2 .byte $21,$00,$C2
+FA24: 4A 42 05 .byte $4A,$42,$05
+FA27: 11 1F C2 .byte $11,$1F,$C2
+FA2A: CD 68 05 .byte $CD,$68,$05
+FA2D: F9 CB AE .byte $F9,$CB,$AE
+FA30: 4E 28 06 .byte $4E,$28,$06
+FA33: 3E 01 32 .byte $3E,$01,$32
+FA36: 15 C7 C9 .byte $15,$C7,$C9
+FA39: 3A 15 C7 .byte $3A,$15,$C7
+FA3C: A7 28 0D .byte $A7,$28,$0D
+FA3F: 97 32 15 .byte $97,$32,$15
+FA42: C7 3D 32 .byte $C7,$3D,$32
+FA45: 11 C3 3E .byte $11,$C3,$3E
+FA48: 3F 32 12 .byte $3F,$32,$12
+FA4B: C3 11 14 .byte $C3,$11,$14
+FA4E: C3 DD 21 .byte $C3,$DD,$21
+FA51: 50 C3 CD .byte $50,$C3,$CD
+FA54: 42 05 11 .byte $42,$05,$11
+FA57: 1F C3 CD .byte $1F,$C3,$CD
+FA5A: 68 05 C9 .byte $68,$05,$C9
+FA5D: DE 4E 11 .byte $DE,$4E,$11
+FA60: 97 DD 77 .byte $97,$DD,$77
+FA63: 11 47 CD .byte $11,$47,$CD
+FA66: 10 06 CD .byte $10,$06,$CD
+FA69: 10 06 AC .byte $10,$06,$AC
+FA6C: 10 06 79 .byte $10,$06,$79
+FA6F: A7 C8 18 .byte $A7,$C8,$18
+FA72: 02 04 13 .byte $02,$04,$13
+FA75: 1F 30 FB .byte $1F,$30,$FB
+FA78: 4F 70 1A .byte $4F,$70,$1A
+FA7B: 23 77 2B .byte $23,$77,$2B
+FA7E: 79 A7 20 .byte $79,$A7,$20
+FA81: F1 C9 DD .byte $F1,$C9,$DD
+FA84: 4E 12 DD .byte $4E,$12,$DD
+FA87: 36 12 00 .byte $36,$12,$00
+FA8A: 06 0B CD .byte $06,$0B,$CD
+FA8D: 10 06 CB .byte $10,$06,$CB
+FA90: 39 30 05 .byte $39,$30,$05
+FA93: 70 1A 23 .byte $70,$1A,$23
+FA96: 77 2B 13 .byte $77,$2B,$13
+FA99: 04 79 E6 .byte $04,$79,$E6
+FA9C: 03 C4 A3 .byte $03,$C4,$A3
+FA9F: 05 13 13 .byte $05,$13,$13
+FAA2: 06 0F 79 .byte $06,$0F,$79
+FAA5: E6 0C C4 .byte $E6,$0C,$C4
+FAA8: 90 05 C9 .byte $90,$05,$C9
+FAAB: 70 1A E6 .byte $70,$1A,$E6
+FAAE: 0F 86 07 .byte $0F,$86,$07
+FAB1: A4 07 47 .byte $A4,$07,$47
+FAB4: 13 1A 1B .byte $13,$1A,$1B
+FAB7: E6 0F B0 .byte $E6,$0F,$B0
+FABA: 23       .byte $23
 
 ; TRANSLATOR_TABLE_1:
-FABB: 77 2B    .byte $77,$2B
-FABD: C9 C5    .byte $C9,$C5
-FABF: 70 1A    .byte $70,$1A
-FAC1: E6 0F    .byte $E6,$0F
-FAC3: 47 7D    .byte $47,$7D
-FAC5: FE 02    .byte $FE,$02
-FAC7: 28 41    .byte $28,$41
-FAC9: 78 32    .byte $78,$32
-FACB: 1C BF    .byte $1C,$BF
-FACD: 3A 1B    .byte $3A,$1B
-FACF: C7 4F    .byte $C7,$4F
-FAD1: 78 E5    .byte $78,$E5
-FAD3: D5 CD    .byte $D5,$CD
-FAD5: FA 01    .byte $FA,$01
-FAD7: D1 E1    .byte $D1,$E1
-FAD9: 13 1A    .byte $13,$1A
-FADB: 1B 32    .byte $1B,$32
-FADD: 1D 9B    .byte $1D,$9B
-FADF: E6 F0    .byte $E6,$F0
-FAE1: 07 2E    .byte $07,$2E
-FAE3: 07 07    .byte $07,$07
-FAE5: B0 23    .byte $B0,$23
-FAE7: 77 2B    .byte $77,$2B
-FAE9: E5 21    .byte $E5,$21
-FAEB: 02 C8    .byte $02,$C8
-FAED: 3A 1E    .byte $3A,$1E
-FAEF: 9A 47    .byte $9A,$47
-FAF1: 3A 1B    .byte $3A,$1B
-FAF3: C7 4F    .byte $C7,$4F
-FAF5: 78 E5    .byte $78,$E5
-FAF7: D5 CD    .byte $D5,$CD
-FAF9: FA 01    .byte $FA,$01
-FAFB: D1 E1    .byte $D1,$E1
-FAFD: 3A 1D    .byte $3A,$1D
-FAFF: C7 E6    .byte $C7,$E6
-FB01: 0F B0    .byte $0F,$B0
-FB03: 36 0E    .byte $36,$0E
-FB05: 23 77    .byte $23,$77
-FB07: E1 C1    .byte $E1,$C1
-FB09: C9 78    .byte $C9,$78
-FB0B: 32 1E    .byte $32,$1E
-FB0D: C7 3A    .byte $C7,$3A
-FB0F: 1B C7    .byte $1B,$C7
-FB11: 4F 78    .byte $4F,$78
-FB13: E5 D5    .byte $E5,$D5
-FB15: CD FA    .byte $CD,$FA
-FB17: 01 D1    .byte $01,$D1
-FB19: E1 3A    .byte $E1,$3A
-FB1B: 1D C7    .byte $1D,$C7
-FB1D: E6 0F    .byte $E6,$0F
-FB1F: B0 23    .byte $B0,$23
-FB21: 77 2C    .byte $77,$2C
-FB23: 13 1A    .byte $13,$1A
-FB25: 1B 32    .byte $1B,$32
-FB27: 00 CC    .byte $00,$CC
-FB29: C1 C9    .byte $C1,$C9
-FB2B: CB 39    .byte $CB,$39
-FB2D: 30 B1    .byte $30,$B1
-FB2F: 70 1A    .byte $70,$1A
-FB31: 23 77    .byte $23,$77
-FB33: 2B 04    .byte $2B,$04
-FB35: 13 70    .byte $13,$70
-FB37: 1A 23    .byte $1A,$23
-FB39: 77 2B    .byte $77,$2B
-FB3B: 04 13    .byte $04,$13
-FB3D: C9 BD    .byte $C9,$BD
-FB3F: 04 13    .byte $04,$13
-FB41: 13 C9    .byte $13,$C9
-FB43: DD 21    .byte $DD,$21
-FB45: 00 C0    .byte $00,$C0
-FB47: 21 00    .byte $21,$00
-FB49: C0 22    .byte $C0,$22
-FB4B: 12 BE    .byte $12,$BE
-FB4D: CB 46    .byte $CB,$46
-FB4F: C4 A0    .byte $C4,$A0
-FB51: 06 DD    .byte $06,$DD
-FB53: CB 00    .byte $CB,$00
-FB55: 4E 28    .byte $4E,$28
-FB57: 09 DD    .byte $09,$DD
-FB59: 35 13    .byte $35,$13
-FB5B: CC 7B    .byte $CC,$7B
-FB5D: 07 CD    .byte $07,$CD
-FB5F: D5 09    .byte $D5,$09
-FB61: DD 21    .byte $DD,$21
-FB63: 00 C1    .byte $00,$C1
-FB65: 21 00    .byte $21,$00
-FB67: C1 22    .byte $C1,$22
-FB69: 12 C7    .byte $12,$C7
-FB6B: CB 46    .byte $CB,$46
-FB6D: C4 A0    .byte $C4,$A0
-FB6F: 06 DD    .byte $06,$DD
-FB71: CB 00    .byte $CB,$00
-FB73: 4E 28    .byte $4E,$28
-FB75: 09 DD    .byte $09,$DD
-FB77: 35 13    .byte $35,$13
-FB79: CC 7B    .byte $CC,$7B
-FB7B: 07 CD    .byte $07,$CD
-FB7D: D5 09    .byte $D5,$09
-FB7F: DD 21    .byte $DD,$21
-FB81: 00 C2    .byte $00,$C2
-FB83: 21 00    .byte $21,$00
-FB85: C2 22    .byte $C2,$22
-FB87: 12 C7    .byte $12,$C7
-FB89: CB 46    .byte $CB,$46
-FB8B: C4 A0    .byte $C4,$A0
-FB8D: 06 DD    .byte $06,$DD
-FB8F: CB 6C    .byte $CB,$6C
-FB91: 4E 28    .byte $4E,$28
-FB93: 09 DD    .byte $09,$DD
-FB95: 35 13    .byte $35,$13
-FB97: CC 7B    .byte $CC,$7B
-FB99: 07 CD    .byte $07,$CD
-FB9B: D5 09    .byte $D5,$09
-FB9D: DD 21    .byte $DD,$21
-FB9F: 00 C3    .byte $00,$C3
-FBA1: 21 00    .byte $21,$00
-FBA3: C3 22    .byte $C3,$22
-FBA5: 12 C7    .byte $12,$C7
-FBA7: CB 46    .byte $CB,$46
-FBA9: C4 A0    .byte $C4,$A0
-FBAB: 06 DD    .byte $06,$DD
-FBAD: CB 00    .byte $CB,$00
-FBAF: 4E C8    .byte $4E,$C8
-FBB1: DD 35    .byte $DD,$35
-FBB3: 13 CC    .byte $13,$CC
-FBB5: 7B 07    .byte $7B,$07
-FBB7: CD D5    .byte $CD,$D5
-FBB9: 09 C9    .byte $09,$C9
+FABB: 77 2B C9 .byte $77,$2B,$C9
+FABE: C5 70 1A .byte $C5,$70,$1A
+FAC1: E6 0F 47 .byte $E6,$0F,$47
+FAC4: 7D FE 02 .byte $7D,$FE,$02
+FAC7: 28 41 78 .byte $28,$41,$78
+FACA: 32 1C BF .byte $32,$1C,$BF
+FACD: 3A 1B C7 .byte $3A,$1B,$C7
+FAD0: 4F 78 E5 .byte $4F,$78,$E5
+FAD3: D5 CD FA .byte $D5,$CD,$FA
+FAD6: 01 D1 E1 .byte $01,$D1,$E1
+FAD9: 13 1A 1B .byte $13,$1A,$1B
+FADC: 32 1D 9B .byte $32,$1D,$9B
+FADF: E6 F0 07 .byte $E6,$F0,$07
+FAE2: 2E 07 07 .byte $2E,$07,$07
+FAE5: B0 23 77 .byte $B0,$23,$77
+FAE8: 2B E5 21 .byte $2B,$E5,$21
+FAEB: 02 C8 3A .byte $02,$C8,$3A
+FAEE: 1E 9A 47 .byte $1E,$9A,$47
+FAF1: 3A 1B C7 .byte $3A,$1B,$C7
+FAF4: 4F 78 E5 .byte $4F,$78,$E5
+FAF7: D5 CD FA .byte $D5,$CD,$FA
+FAFA: 01 D1 E1 .byte $01,$D1,$E1
+FAFD: 3A 1D C7 .byte $3A,$1D,$C7
+FB00: E6 0F B0 .byte $E6,$0F,$B0
+FB03: 36 0E 23 .byte $36,$0E,$23
+FB06: 77 E1 C1 .byte $77,$E1,$C1
+FB09: C9 78 32 .byte $C9,$78,$32
+FB0C: 1E C7 3A .byte $1E,$C7,$3A
+FB0F: 1B C7 4F .byte $1B,$C7,$4F
+FB12: 78 E5 D5 .byte $78,$E5,$D5
+FB15: CD FA 01 .byte $CD,$FA,$01
+FB18: D1 E1 3A .byte $D1,$E1,$3A
+FB1B: 1D C7 E6 .byte $1D,$C7,$E6
+FB1E: 0F B0 23 .byte $0F,$B0,$23
+FB21: 77 2C 13 .byte $77,$2C,$13
+FB24: 1A 1B 32 .byte $1A,$1B,$32
+FB27: 00 CC C1 .byte $00,$CC,$C1
+FB2A: C9 CB 39 .byte $C9,$CB,$39
+FB2D: 30 B1 70 .byte $30,$B1,$70
+FB30: 1A 23 77 .byte $1A,$23,$77
+FB33: 2B 04 13 .byte $2B,$04,$13
+FB36: 70 1A 23 .byte $70,$1A,$23
+FB39: 77 2B 04 .byte $77,$2B,$04
+FB3C: 13 C9 BD .byte $13,$C9,$BD
+FB3F: 04 13 13 .byte $04,$13,$13
+FB42: C9 DD 21 .byte $C9,$DD,$21
+FB45: 00 C0 21 .byte $00,$C0,$21
+FB48: 00 C0 22 .byte $00,$C0,$22
+FB4B: 12 BE CB .byte $12,$BE,$CB
+FB4E: 46 C4 A0 .byte $46,$C4,$A0
+FB51: 06 DD CB .byte $06,$DD,$CB
+FB54: 00 4E 28 .byte $00,$4E,$28
+FB57: 09 DD 35 .byte $09,$DD,$35
+FB5A: 13 CC 7B .byte $13,$CC,$7B
+FB5D: 07 CD D5 .byte $07,$CD,$D5
+FB60: 09 DD 21 .byte $09,$DD,$21
+FB63: 00 C1 21 .byte $00,$C1,$21
+FB66: 00 C1 22 .byte $00,$C1,$22
+FB69: 12 C7 CB .byte $12,$C7,$CB
+FB6C: 46 C4 A0 .byte $46,$C4,$A0
+FB6F: 06 DD CB .byte $06,$DD,$CB
+FB72: 00 4E 28 .byte $00,$4E,$28
+FB75: 09 DD 35 .byte $09,$DD,$35
+FB78: 13 CC 7B .byte $13,$CC,$7B
+FB7B: 07 CD D5 .byte $07,$CD,$D5
+FB7E: 09 DD 21 .byte $09,$DD,$21
+FB81: 00 C2 21 .byte $00,$C2,$21
+FB84: 00 C2 22 .byte $00,$C2,$22
+FB87: 12 C7 CB .byte $12,$C7,$CB
+FB8A: 46 C4 A0 .byte $46,$C4,$A0
+FB8D: 06 DD CB .byte $06,$DD,$CB
+FB90: 6C 4E 28 .byte $6C,$4E,$28
+FB93: 09 DD 35 .byte $09,$DD,$35
+FB96: 13 CC 7B .byte $13,$CC,$7B
+FB99: 07 CD D5 .byte $07,$CD,$D5
+FB9C: 09 DD 21 .byte $09,$DD,$21
+FB9F: 00 C3 21 .byte $00,$C3,$21
+FBA2: 00 C3 22 .byte $00,$C3,$22
+FBA5: 12 C7 CB .byte $12,$C7,$CB
+FBA8: 46 C4 A0 .byte $46,$C4,$A0
+FBAB: 06 DD CB .byte $06,$DD,$CB
+FBAE: 00 4E C8 .byte $00,$4E,$C8
+FBB1: DD 35 13 .byte $DD,$35,$13
+FBB4: CC 7B 07 .byte $CC,$7B,$07
+FBB7: CD D5 09 .byte $CD,$D5,$09
+FBBA: C9       .byte $C9
 
 ; TRANSLATOR_TABLE_2:
-FBBB: 36 02    .byte $36,$02
-FBBD: 23 5E    .byte $23,$5E
-FBBF: 23 56    .byte $23,$56
-FBC1: 1A 23    .byte $1A,$23
-FBC3: 9F 77    .byte $9F,$77
-FBC5: 13 1A    .byte $13,$1A
-FBC7: E6 0F    .byte $E6,$0F
-FBC9: 20 02    .byte $20,$02
-FBCB: 3E 10    .byte $3E,$10
-FBCD: 23 23    .byte $23,$23
-FBCF: CF 13    .byte $CF,$13
-FBD1: 1A 23    .byte $1A,$23
-FBD3: 75 13    .byte $75,$13
-FBD5: 1A 23    .byte $1A,$23
-FBD7: 77 13    .byte $77,$13
-FBD9: DD 73    .byte $DD,$73
-FBDB: 0D 9E    .byte $0D,$9E
-FBDD: 72 0E    .byte $72,$0E
-FBDF: CD CE    .byte $CD,$CE
-FBE1: 06 2A    .byte $06,$2A
-FBE3: 12 C7    .byte $12,$C7
-FBE5: CD E5    .byte $CD,$E5
-FBE7: 06 C9    .byte $06,$C9
-FBE9: 1A E6    .byte $1A,$E6
-FBEB: F0 DD    .byte $F0,$DD
-FBED: 77 05    .byte $77,$05
-FBEF: 1A E6    .byte $1A,$E6
-FBF1: 0F DD    .byte $0F,$DD
-FBF3: 57 0A    .byte $57,$0A
-FBF5: 13 1A    .byte $13,$1A
-FBF7: DD 77    .byte $DD,$77
-FBF9: 0B 13    .byte $0B,$13
-FBFB: 1A 9D    .byte $1A,$9D
-FBFD: 71 0C    .byte $71,$0C
-FBFF: C9 11    .byte $C9,$11
-FC01: 10 76    .byte $10,$76
-FC03: 19 97    .byte $19,$97
-FC05: 77 23    .byte $77,$23
-FC07: 36 1F    .byte $36,$1F
-FC09: 23 36    .byte $23,$36
-FC0B: 3B 23    .byte $3B,$23
-FC0D: 36 01    .byte $36,$01
-FC0F: 23 06    .byte $23,$06
-FC11: 0E B6    .byte $0E,$B6
-FC13: 23 10    .byte $23,$10
-FC15: FC 3E    .byte $FC,$3E
-FC17: F8 DD    .byte $F8,$DD
-FC19: 77 1B    .byte $77,$1B
-FC1B: 3E 08    .byte $3E,$08
-FC1D: 23 36    .byte $23,$36
-FC1F: 80 23    .byte $80,$23
-FC21: 77 23    .byte $77,$23
-FC23: 74 23    .byte $74,$23
-FC25: 11 0B    .byte $11,$0B
-FC27: 00 06    .byte $00,$06
-FC29: 0B 97    .byte $0B,$97
-FC2B: 77 19    .byte $77,$19
-FC2D: 10 FC    .byte $10,$FC
-FC2F: C9 DD    .byte $C9,$DD
-FC31: 7E 0A    .byte $7E,$0A
-FC33: A7 28    .byte $A7,$28
-FC35: 06 3D    .byte $06,$3D
-FC37: 28 18    .byte $28,$18
-FC39: DD 77    .byte $DD,$77
-FC3B: 0A DD    .byte $0A,$DD
-FC3D: 5E 0D    .byte $5E,$0D
-FC3F: DD 56    .byte $DD,$56
-FC41: 0E 13    .byte $0E,$13
-FC43: 1A DD    .byte $1A,$DD
-FC45: 58 0B    .byte $58,$0B
-FC47: 13 1A    .byte $13,$1A
-FC49: 45 4C    .byte $45,$4C
-FC4B: 0C D0    .byte $0C,$D0
-FC4D: 36 13    .byte $36,$13
-FC4F: 01 C9    .byte $01,$C9
-FC51: DD 35    .byte $DD,$35
-FC53: 07 28    .byte $07,$28
-FC55: 17 DD    .byte $17,$DD
-FC57: 5E 0D    .byte $5E,$0D
-FC59: DD 56    .byte $DD,$56
-FC5B: 0E 13    .byte $0E,$13
-FC5D: 13 13    .byte $13,$13
-FC5F: DD 73    .byte $DD,$73
-FC61: 0D DD    .byte $0D,$DD
-FC63: 72 0E    .byte $72,$0E
-FC65: CD CE    .byte $CD,$CE
-FC67: 06 DD    .byte $06,$DD
-FC69: 36 13    .byte $36,$13
-FC6B: 01 C9    .byte $01,$C9
-FC6D: DD 35    .byte $DD,$35
-FC6F: 06 20    .byte $06,$20
-FC71: 09 CB    .byte $09,$CB
-FC73: 8E CD    .byte $8E,$CD
-FC75: E5 06    .byte $E5,$06
-FC77: CD 83    .byte $CD,$83
-FC79: 04 C9    .byte $04,$C9
-FC7B: BD 5E    .byte $BD,$5E
-FC7D: 01 DD    .byte $01,$DD
-FC7F: 56 02    .byte $56,$02
-FC81: 13 13    .byte $13,$13
-FC83: 1A DD    .byte $1A,$DD
-FC85: 77 07    .byte $77,$07
-FC87: 13 13    .byte $13,$13
-FC89: DD 73    .byte $DD,$73
-FC8B: 0D 6B    .byte $0D,$6B
-FC8D: 72 0E    .byte $72,$0E
-FC8F: CD CE    .byte $CD,$CE
-FC91: 06 CD    .byte $06,$CD
-FC93: E5 06    .byte $E5,$06
-FC95: C9 DD    .byte $C9,$DD
-FC97: 4E 0B    .byte $4E,$0B
-FC99: DD 46    .byte $DD,$46
-FC9B: 0C 0A    .byte $0C,$0A
-FC9D: FE F0    .byte $FE,$F0
-FC9F: 20 02    .byte $20,$02
-FCA1: 03 0A    .byte $03,$0A
-FCA3: A7 20    .byte $A7,$20
-FCA5: 04 CD    .byte $04,$CD
-FCA7: 15 07    .byte $15,$07
-FCA9: C9 DD    .byte $C9,$DD
-FCAB: BC 13    .byte $BC,$13
-FCAD: CD 9C    .byte $CD,$9C
-FCAF: 07 DD    .byte $07,$DD
-FCB1: 71 0B    .byte $71,$0B
-FCB3: DD 70    .byte $DD,$70
-FCB5: 0C C9    .byte $0C,$C9
-FCB7: 03 0A    .byte $03,$0A
-FCB9: E6 C0    .byte $E6,$C0
+FBBB: 36 02 23 .byte $36,$02,$23
+FBBE: 5E 23 56 .byte $5E,$23,$56
+FBC1: 1A 23 9F .byte $1A,$23,$9F
+FBC4: 77 13 1A .byte $77,$13,$1A
+FBC7: E6 0F 20 .byte $E6,$0F,$20
+FBCA: 02 3E 10 .byte $02,$3E,$10
+FBCD: 23 23 CF .byte $23,$23,$CF
+FBD0: 13 1A 23 .byte $13,$1A,$23
+FBD3: 75 13 1A .byte $75,$13,$1A
+FBD6: 23 77 13 .byte $23,$77,$13
+FBD9: DD 73 0D .byte $DD,$73,$0D
+FBDC: 9E 72 0E .byte $9E,$72,$0E
+FBDF: CD CE 06 .byte $CD,$CE,$06
+FBE2: 2A 12 C7 .byte $2A,$12,$C7
+FBE5: CD E5 06 .byte $CD,$E5,$06
+FBE8: C9 1A E6 .byte $C9,$1A,$E6
+FBEB: F0 DD 77 .byte $F0,$DD,$77
+FBEE: 05 1A E6 .byte $05,$1A,$E6
+FBF1: 0F DD 57 .byte $0F,$DD,$57
+FBF4: 0A 13 1A .byte $0A,$13,$1A
+FBF7: DD 77 0B .byte $DD,$77,$0B
+FBFA: 13 1A 9D .byte $13,$1A,$9D
+FBFD: 71 0C C9 .byte $71,$0C,$C9
+FC00: 11 10 76 .byte $11,$10,$76
+FC03: 19 97 77 .byte $19,$97,$77
+FC06: 23 36 1F .byte $23,$36,$1F
+FC09: 23 36 3B .byte $23,$36,$3B
+FC0C: 23 36 01 .byte $23,$36,$01
+FC0F: 23 06 0E .byte $23,$06,$0E
+FC12: B6 23 10 .byte $B6,$23,$10
+FC15: FC 3E F8 .byte $FC,$3E,$F8
+FC18: DD 77 1B .byte $DD,$77,$1B
+FC1B: 3E 08 23 .byte $3E,$08,$23
+FC1E: 36 80 23 .byte $36,$80,$23
+FC21: 77 23 74 .byte $77,$23,$74
+FC24: 23 11 0B .byte $23,$11,$0B
+FC27: 00 06 0B .byte $00,$06,$0B
+FC2A: 97 77 19 .byte $97,$77,$19
+FC2D: 10 FC C9 .byte $10,$FC,$C9
+FC30: DD 7E 0A .byte $DD,$7E,$0A
+FC33: A7 28 06 .byte $A7,$28,$06
+FC36: 3D 28 18 .byte $3D,$28,$18
+FC39: DD 77 0A .byte $DD,$77,$0A
+FC3C: DD 5E 0D .byte $DD,$5E,$0D
+FC3F: DD 56 0E .byte $DD,$56,$0E
+FC42: 13 1A DD .byte $13,$1A,$DD
+FC45: 58 0B 13 .byte $58,$0B,$13
+FC48: 1A 45 4C .byte $1A,$45,$4C
+FC4B: 0C D0 36 .byte $0C,$D0,$36
+FC4E: 13 01 C9 .byte $13,$01,$C9
+FC51: DD 35 07 .byte $DD,$35,$07
+FC54: 28 17 DD .byte $28,$17,$DD
+FC57: 5E 0D DD .byte $5E,$0D,$DD
+FC5A: 56 0E 13 .byte $56,$0E,$13
+FC5D: 13 13 DD .byte $13,$13,$DD
+FC60: 73 0D DD .byte $73,$0D,$DD
+FC63: 72 0E CD .byte $72,$0E,$CD
+FC66: CE 06 DD .byte $CE,$06,$DD
+FC69: 36 13 01 .byte $36,$13,$01
+FC6C: C9 DD 35 .byte $C9,$DD,$35
+FC6F: 06 20 09 .byte $06,$20,$09
+FC72: CB 8E CD .byte $CB,$8E,$CD
+FC75: E5 06 CD .byte $E5,$06,$CD
+FC78: 83 04 C9 .byte $83,$04,$C9
+FC7B: BD 5E 01 .byte $BD,$5E,$01
+FC7E: DD 56 02 .byte $DD,$56,$02
+FC81: 13 13 1A .byte $13,$13,$1A
+FC84: DD 77 07 .byte $DD,$77,$07
+FC87: 13 13 DD .byte $13,$13,$DD
+FC8A: 73 0D 6B .byte $73,$0D,$6B
+FC8D: 72 0E CD .byte $72,$0E,$CD
+FC90: CE 06 CD .byte $CE,$06,$CD
+FC93: E5 06 C9 .byte $E5,$06,$C9
+FC96: DD 4E 0B .byte $DD,$4E,$0B
+FC99: DD 46 0C .byte $DD,$46,$0C
+FC9C: 0A FE F0 .byte $0A,$FE,$F0
+FC9F: 20 02 03 .byte $20,$02,$03
+FCA2: 0A A7 20 .byte $0A,$A7,$20
+FCA5: 04 CD 15 .byte $04,$CD,$15
+FCA8: 07 C9 DD .byte $07,$C9,$DD
+FCAB: BC 13 CD .byte $BC,$13,$CD
+FCAE: 9C 07 DD .byte $9C,$07,$DD
+FCB1: 71 0B DD .byte $71,$0B,$DD
+FCB4: 70 0C C9 .byte $70,$0C,$C9
+FCB7: 03 0A E6 .byte $03,$0A,$E6
+FCBA: C0       .byte $C0
 
 ; TRANSLATOR_TABLE_3
-FCBB: C8 0A    .byte $C8,$0A
-FCBD: E6 F0    .byte $E6,$F0
-FCBF: D6 40    .byte $D6,$40
-FCC1: 0F 0F    .byte $0F,$0F
-FCC3: 0F 5F    .byte $0F,$5F
-FCC5: 16 00    .byte $16,$00
-FCC7: 21 5F    .byte $21,$5F
-FCC9: 08 19    .byte $08,$19
-FCCB: 5E 23    .byte $5E,$23
-FCCD: 56 EB    .byte $56,$EB
-FCCF: 0A E6    .byte $0A,$E6
-FCD1: 0F E9    .byte $0F,$E9
-FCD3: DD 77    .byte $DD,$77
-FCD5: 15 03    .byte $15,$03
-FCD7: 0A DD    .byte $0A,$DD
-FCD9: 77 14    .byte $77,$14
-FCDB: E3 01    .byte $E3,$01
-FCDD: B5 C3    .byte $B5,$C3
-FCDF: 4E 08    .byte $4E,$08
-FCE1: DD BB    .byte $DD,$BB
-FCE3: 17 03    .byte $17,$03
-FCE5: 0A DD    .byte $0A,$DD
-FCE7: 77 16    .byte $77,$16
-FCE9: 11 02    .byte $11,$02
-FCEB: 85 18    .byte $85,$18
-FCED: 7B DD    .byte $7B,$DD
-FCEF: 77 19    .byte $77,$19
-FCF1: 03 0A    .byte $03,$0A
-FCF3: DD 77    .byte $DD,$77
-FCF5: 18 11    .byte $18,$11
-FCF7: 04 00    .byte $04,$00
-FCF9: 18 6E    .byte $18,$6E
-FCFB: 07 92    .byte $07,$92
-FCFD: BA 07    .byte $BA,$07
-FCFF: DD D7    .byte $DD,$D7
-FD01: 1F 03    .byte $1F,$03
-FD03: 0A DD    .byte $0A,$DD
-FD05: D9 20    .byte $D9,$20
-FD07: 11 EF    .byte $11,$EF
-FD09: 03 15    .byte $03,$15
-FD0B: 5D D4    .byte $5D,$D4
-FD0D: 77 1C    .byte $77,$1C
-FD0F: 91 20    .byte $91,$20
-FD11: 64 79    .byte $64,$79
-FD13: 2F E4    .byte $2F,$E4
-FD15: 67 6F    .byte $67,$6F
-FD17: D5 42    .byte $D5,$42
-FD19: 10 16    .byte $10,$16
-FD1B: 4D DA    .byte $4D,$DA
-FD1D: 17 1D    .byte $17,$1D
-FD1F: 1E 40    .byte $1E,$40
-FD21: E2 0B    .byte $E2,$0B
-FD23: 2F 5D    .byte $2F,$5D
-FD25: 66 10    .byte $66,$10
-FD27: D5 77    .byte $D5,$77
-FD29: 12 17    .byte $12,$17
-FD2B: 3D ED    .byte $3D,$ED
-FD2D: 73 1E    .byte $73,$1E
-FD2F: E1 80    .byte $E1,$80
-FD31: 34 7C    .byte $34,$7C
-FD33: 2F D5    .byte $2F,$D5
-FD35: A6 10    .byte $A6,$10
-FD37: DD EE    .byte $DD,$EE
-FD39: 13 18    .byte $13,$18
-FD3B: 2D F2    .byte $2D,$F2
-FD3D: A7 22    .byte $A7,$22
-FD3F: 11 62    .byte $11,$62
-FD41: 04 18    .byte $04,$18
-FD43: 25 03    .byte $25,$03
-FD45: 0A DD    .byte $0A,$DD
-FD47: D8 23    .byte $D8,$23
-FD49: 11 00    .byte $11,$00
-FD4B: 08 18    .byte $08,$18
-FD4D: 1B DD    .byte $1B,$DD
-FD4F: 5E 24    .byte $5E,$24
-FD51: 11 65    .byte $11,$65
-FD53: 10 18    .byte $10,$18
-FD55: 13 DD    .byte $13,$DD
-FD57: 77 25    .byte $77,$25
-FD59: 11 00    .byte $11,$00
-FD5B: 20 18    .byte $20,$18
-FD5D: 0B CD    .byte $0B,$CD
-FD5F: 77 08    .byte $77,$08
-FD61: 7A B3    .byte $7A,$B3
-FD63: CA 9C    .byte $CA,$9C
-FD65: 07 CB    .byte $07,$CB
-FD67: 7A C0    .byte $7A,$C0
-FD69: DD 7E    .byte $DD,$7E
-FD6B: 61 B3    .byte $61,$B3
-FD6D: DB 77    .byte $DB,$77
-FD6F: 6A B4    .byte $6A,$B4
-FD71: 7E 12    .byte $7E,$12
-FD73: B2 DD    .byte $B2,$DD
-FD75: 77 12    .byte $77,$12
-FD77: C3 9C    .byte $C3,$9C
-FD79: 07 B8    .byte $07,$B8
-FD7B: 44 C6    .byte $44,$C6
-FD7D: 07 D3    .byte $07,$D3
-FD7F: 07 E0    .byte $07,$E0
-FD81: 45 F1    .byte $45,$F1
-FD83: 07 01    .byte $07,$01
-FD85: 08 11    .byte $08,$11
-FD87: 08 21    .byte $08,$21
-FD89: 08 29    .byte $08,$29
-FD8B: 08 33    .byte $08,$33
-FD8D: 08 3B    .byte $08,$3B
-FD8F: 08 43    .byte $08,$43
-FD91: 08 87    .byte $08,$87
-FD93: 87 5F    .byte $87,$5F
-FD95: 16 00    .byte $16,$00
-FD97: 21 37    .byte $21,$37
-FD99: 09 19    .byte $09,$19
-FD9B: 5E 23    .byte $5E,$23
-FD9D: 56 D5    .byte $56,$D5
-FD9F: 23 5E    .byte $23,$5E
-FDA1: 23 56    .byte $23,$56
-FDA3: 03 0A    .byte $03,$0A
-FDA5: C9 0B    .byte $C9,$0B
-FDA7: C9 E6    .byte $C9,$E6
-FDA9: 1F DD    .byte $1F,$DD
-FDAB: 77 1A    .byte $77,$1A
-FDAD: C9 21    .byte $C9,$21
-FDAF: 84 19    .byte $84,$19
-FDB1: CD 87    .byte $CD,$87
-FDB3: 09 FD    .byte $09,$FD
-FDB5: CB B9    .byte $CB,$B9
-FDB7: CE 11    .byte $CE,$11
-FDB9: 00 48    .byte $00,$48
+FCBB: C8 0A E6 .byte $C8,$0A,$E6
+FCBE: F0 D6 40 .byte $F0,$D6,$40
+FCC1: 0F 0F 0F .byte $0F,$0F,$0F
+FCC4: 5F 16 00 .byte $5F,$16,$00
+FCC7: 21 5F 08 .byte $21,$5F,$08
+FCCA: 19 5E 23 .byte $19,$5E,$23
+FCCD: 56 EB 0A .byte $56,$EB,$0A
+FCD0: E6 0F E9 .byte $E6,$0F,$E9
+FCD3: DD 77 15 .byte $DD,$77,$15
+FCD6: 03 0A DD .byte $03,$0A,$DD
+FCD9: 77 14 E3 .byte $77,$14,$E3
+FCDC: 01 B5 C3 .byte $01,$B5,$C3
+FCDF: 4E 08 DD .byte $4E,$08,$DD
+FCE2: BB 17 03 .byte $BB,$17,$03
+FCE5: 0A DD 77 .byte $0A,$DD,$77
+FCE8: 16 11 02 .byte $16,$11,$02
+FCEB: 85 18 7B .byte $85,$18,$7B
+FCEE: DD 77 19 .byte $DD,$77,$19
+FCF1: 03 0A DD .byte $03,$0A,$DD
+FCF4: 77 18 11 .byte $77,$18,$11
+FCF7: 04 00 18 .byte $04,$00,$18
+FCFA: 6E 07 92 .byte $6E,$07,$92
+FCFD: BA 07 DD .byte $BA,$07,$DD
+FD00: D7 1F 03 .byte $D7,$1F,$03
+FD03: 0A DD D9 .byte $0A,$DD,$D9
+FD06: 20 11 EF .byte $20,$11,$EF
+FD09: 03 15 5D .byte $03,$15,$5D
+FD0C: D4 77 1C .byte $D4,$77,$1C
+FD0F: 91 20 64 .byte $91,$20,$64
+FD12: 79 2F E4 .byte $79,$2F,$E4
+FD15: 67 6F D5 .byte $67,$6F,$D5
+FD18: 42 10 16 .byte $42,$10,$16
+FD1B: 4D DA 17 .byte $4D,$DA,$17
+FD1E: 1D 1E 40 .byte $1D,$1E,$40
+FD21: E2 0B 2F .byte $E2,$0B,$2F
+FD24: 5D 66 10 .byte $5D,$66,$10
+FD27: D5 77 12 .byte $D5,$77,$12
+FD2A: 17 3D ED .byte $17,$3D,$ED
+FD2D: 73 1E E1 .byte $73,$1E,$E1
+FD30: 80 34 7C .byte $80,$34,$7C
+FD33: 2F D5 A6 .byte $2F,$D5,$A6
+FD36: 10 DD EE .byte $10,$DD,$EE
+FD39: 13 18 2D .byte $13,$18,$2D
+FD3C: F2 A7 22 .byte $F2,$A7,$22
+FD3F: 11 62 04 .byte $11,$62,$04
+FD42: 18 25 03 .byte $18,$25,$03
+FD45: 0A DD D8 .byte $0A,$DD,$D8
+FD48: 23 11 00 .byte $23,$11,$00
+FD4B: 08 18 1B .byte $08,$18,$1B
+FD4E: DD 5E 24 .byte $DD,$5E,$24
+FD51: 11 65 10 .byte $11,$65,$10
+FD54: 18 13 DD .byte $18,$13,$DD
+FD57: 77 25 11 .byte $77,$25,$11
+FD5A: 00 20 18 .byte $00,$20,$18
+FD5D: 0B CD 77 .byte $0B,$CD,$77
+FD60: 08 7A B3 .byte $08,$7A,$B3
+FD63: CA 9C 07 .byte $CA,$9C,$07
+FD66: CB 7A C0 .byte $CB,$7A,$C0
+FD69: DD 7E 61 .byte $DD,$7E,$61
+FD6C: B3 DB 77 .byte $B3,$DB,$77
+FD6F: 6A B4 7E .byte $6A,$B4,$7E
+FD72: 12 B2 DD .byte $12,$B2,$DD
+FD75: 77 12 C3 .byte $77,$12,$C3
+FD78: 9C 07 B8 .byte $9C,$07,$B8
+FD7B: 44 C6 07 .byte $44,$C6,$07
+FD7E: D3 07 E0 .byte $D3,$07,$E0
+FD81: 45 F1 07 .byte $45,$F1,$07
+FD84: 01 08 11 .byte $01,$08,$11
+FD87: 08 21 08 .byte $08,$21,$08
+FD8A: 29 08 33 .byte $29,$08,$33
+FD8D: 08 3B 08 .byte $08,$3B,$08
+FD90: 43 08 87 .byte $43,$08,$87
+FD93: 87 5F 16 .byte $87,$5F,$16
+FD96: 00 21 37 .byte $00,$21,$37
+FD99: 09 19 5E .byte $09,$19,$5E
+FD9C: 23 56 D5 .byte $23,$56,$D5
+FD9F: 23 5E 23 .byte $23,$5E,$23
+FDA2: 56 03 0A .byte $56,$03,$0A
+FDA5: C9 0B C9 .byte $C9,$0B,$C9
+FDA8: E6 1F DD .byte $E6,$1F,$DD
+FDAB: 77 1A C9 .byte $77,$1A,$C9
+FDAE: 21 84 19 .byte $21,$84,$19
+FDB1: CD 87 09 .byte $CD,$87,$09
+FDB4: FD CB B9 .byte $FD,$CB,$B9
+FDB7: CE 11 00 .byte $CE,$11,$00
+FDBA: 48       .byte $48
 
 ; TRANSLATOR_TABLE_4
-FDBB: C9 E6    .byte $C9,$E6
-FDBD: 07 F6    .byte $07,$F6
-FDBF: 08 DD    .byte $08,$DD
-FDC1: 77 21    .byte $77,$21
-FDC3: 0A 07    .byte $0A,$07
-FDC5: 38 0F    .byte $38,$0F
-FDC7: 07 38    .byte $07,$38
-FDC9: 06 DD    .byte $06,$DD
-FDCB: 36 0F    .byte $36,$0F
-FDCD: 63 18    .byte $63,$18
-FDCF: 13 82    .byte $13,$82
-FDD1: 36 0F    .byte $36,$0F
-FDD3: 01 18    .byte $01,$18
-FDD5: 0D 07    .byte $0D,$07
-FDD7: 38 06    .byte $38,$06
-FDD9: DD 36    .byte $DD,$36
-FDDB: 0F 02    .byte $0F,$02
-FDDD: 18 04    .byte $18,$04
-FDDF: DD 36    .byte $DD,$36
-FDE1: 0F 04    .byte $0F,$04
-FDE3: E6 E0    .byte $E6,$E0
-FDE5: DD 77    .byte $DD,$77
-FDE7: 10 07    .byte $10,$07
-FDE9: 30 0A    .byte $30,$0A
-FDEB: F4 36    .byte $F4,$36
-FDED: 1E 10    .byte $1E,$10
-FDEF: 5C 36    .byte $5C,$36
-FDF1: 73 00    .byte $73,$00
-FDF3: CB FB    .byte $CB,$FB
-FDF5: 07 30    .byte $07,$30
-FDF7: 0A DD    .byte $0A,$DD
-FDF9: 36 1D    .byte $36,$1D
-FDFB: 10 DE    .byte $10,$DE
-FDFD: 36 68    .byte $36,$68
-FDFF: 69 CB    .byte $69,$CB
-FE01: F3 07    .byte $F3,$07
-FE03: 30 0A    .byte $30,$0A
-FE05: DF 36    .byte $DF,$36
-FE07: 1C 10    .byte $1C,$10
-FE09: DD 36    .byte $DD,$36
-FE0B: 5D E8    .byte $5D,$E8
-FE0D: CB EB    .byte $CB,$EB
-FE0F: 8F 21    .byte $8F,$21
-FE11: 8E 1A    .byte $8E,$1A
-FE13: AA 87    .byte $AA,$87
-FE15: 09 EC    .byte $09,$EC
-FE17: 00 ED    .byte $00,$ED
-FE19: C9 F6    .byte $C9,$F6
-FE1B: C0 DC    .byte $C0,$DC
-FE1D: 77 1B    .byte $77,$1B
-FE1F: C9 21    .byte $C9,$21
-FE21: 84 19    .byte $84,$19
-FE23: CD 87    .byte $CD,$87
-FE25: 09 11    .byte $09,$11
-FE27: 00 00    .byte $00,$00
-FE29: C9 21    .byte $C9,$21
-FE2B: 8E 1A    .byte $8E,$1A
-FE2D: CD 87    .byte $CD,$87
-FE2F: 09 FD    .byte $09,$FD
-FE31: CB 00    .byte $CB,$00
-FE33: D6 11    .byte $D6,$11
-FE35: EC ED    .byte $EC,$ED
-FE37: C9 E6    .byte $C9,$E6
-FE39: F0 20    .byte $F0,$20
-FE3B: 14 0A    .byte $14,$0A
-FE3D: E6 0F    .byte $E6,$0F
-FE3F: 5F 16    .byte $5F,$16
-FE41: 8C 21    .byte $8C,$21
-FE43: 77 09    .byte $77,$09
-FE45: 19 7E    .byte $19,$7E
-FE47: A7 28    .byte $A7,$28
-FE49: 06 2A    .byte $06,$2A
-FE4B: 12 C7    .byte $12,$C7
-FE4D: 5F 19    .byte $5F,$19
-FE4F: 72 5A    .byte $72,$5A
-FE51: C9 8B    .byte $C9,$8B
-FE53: 08 A2    .byte $08,$A2
-FE55: 80 8D    .byte $80,$8D
-FE57: 08 08    .byte $08,$08
-FE59: 00 93    .byte $00,$93
-FE5B: 53 52    .byte $53,$52
-FE5D: A9 A1    .byte $A9,$A1
-FE5F: 08 27    .byte $08,$27
-FE61: 02 F5    .byte $02,$F5
-FE63: 08 26    .byte $08,$26
-FE65: 81 F5    .byte $81,$F5
-FE67: 55 31    .byte $55,$31
-FE69: 00 F5    .byte $00,$F5
-FE6B: 08 3C    .byte $08,$3C
-FE6D: 96 FF    .byte $96,$FF
-FE6F: AF 10    .byte $AF,$10
-FE71: F7 05    .byte $F7,$05
-FE73: 09 5D    .byte $09,$5D
-FE75: 60 05    .byte $60,$05
-FE77: 09 68    .byte $09,$68
-FE79: 00 05    .byte $00,$05
-FE7B: 95 73    .byte $95,$73
-FE7D: 6D 05    .byte $6D,$05
-FE7F: 09 7E    .byte $09,$7E
-FE81: 5B 0F    .byte $5B,$0F
-FE83: 54 47    .byte $54,$47
-FE85: 69 05    .byte $69,$05
-FE87: 09 89    .byte $09,$89
-FE89: 00 05    .byte $00,$05
-FE8B: 09 94    .byte $09,$94
-FE8D: A8 1D    .byte $A8,$1D
-FE8F: 09 8A    .byte $09,$8A
-FE91: 59 88    .byte $59,$88
-FE93: 00 52    .byte $00,$52
-FE95: 27 26    .byte $27,$26
-FE97: 31 3C    .byte $31,$3C
-FE99: 00 5D    .byte $00,$5D
-FE9B: 68 73    .byte $68,$73
-FE9D: 7E 47    .byte $7E,$47
-FE9F: 89 94    .byte $89,$94
-FEA1: E7 FD    .byte $E7,$FD
-FEA3: 2A 12    .byte $2A,$12
-FEA5: C7 FD    .byte $C7,$FD
-FEA7: 19 16    .byte $19,$16
-FEA9: C1 CB    .byte $C1,$CB
-FEAB: 7F 28    .byte $7F,$28
-FEAD: 02 CB    .byte $02,$CB
-FEAF: EA FD    .byte $EA,$FD
-FEB1: 72 C8    .byte $72,$C8
-FEB3: E6 7F    .byte $E6,$7F
-FEB5: FD 53    .byte $FD,$53
-FEB7: 09 5F    .byte $09,$5F
-FEB9: 03 0A    .byte $03,$0A
+FDBB: C9 E6 07 .byte $C9,$E6,$07
+FDBE: F6 08 DD .byte $F6,$08,$DD
+FDC1: 77 21 0A .byte $77,$21,$0A
+FDC4: 07 38 0F .byte $07,$38,$0F
+FDC7: 07 38 06 .byte $07,$38,$06
+FDCA: DD 36 0F .byte $DD,$36,$0F
+FDCD: 63 18 13 .byte $63,$18,$13
+FDD0: 82 36 0F .byte $82,$36,$0F
+FDD3: 01 18 0D .byte $01,$18,$0D
+FDD6: 07 38 06 .byte $07,$38,$06
+FDD9: DD 36 0F .byte $DD,$36,$0F
+FDDC: 02 18 04 .byte $02,$18,$04
+FDDF: DD 36 0F .byte $DD,$36,$0F
+FDE2: 04 E6 E0 .byte $04,$E6,$E0
+FDE5: DD 77 10 .byte $DD,$77,$10
+FDE8: 07 30 0A .byte $07,$30,$0A
+FDEB: F4 36 1E .byte $F4,$36,$1E
+FDEE: 10 5C 36 .byte $10,$5C,$36
+FDF1: 73 00 CB .byte $73,$00,$CB
+FDF4: FB 07 30 .byte $FB,$07,$30
+FDF7: 0A DD 36 .byte $0A,$DD,$36
+FDFA: 1D 10 DE .byte $1D,$10,$DE
+FDFD: 36 68 69 .byte $36,$68,$69
+FE00: CB F3 07 .byte $CB,$F3,$07
+FE03: 30 0A DF .byte $30,$0A,$DF
+FE06: 36 1C 10 .byte $36,$1C,$10
+FE09: DD 36 5D .byte $DD,$36,$5D
+FE0C: E8 CB EB .byte $E8,$CB,$EB
+FE0F: 8F 21 8E .byte $8F,$21,$8E
+FE12: 1A AA 87 .byte $1A,$AA,$87
+FE15: 09 EC 00 .byte $09,$EC,$00
+FE18: ED C9 F6 .byte $ED,$C9,$F6
+FE1B: C0 DC 77 .byte $C0,$DC,$77
+FE1E: 1B C9 21 .byte $1B,$C9,$21
+FE21: 84 19 CD .byte $84,$19,$CD
+FE24: 87 09 11 .byte $87,$09,$11
+FE27: 00 00 C9 .byte $00,$00,$C9
+FE2A: 21 8E 1A .byte $21,$8E,$1A
+FE2D: CD 87 09 .byte $CD,$87,$09
+FE30: FD CB 00 .byte $FD,$CB,$00
+FE33: D6 11 EC .byte $D6,$11,$EC
+FE36: ED C9 E6 .byte $ED,$C9,$E6
+FE39: F0 20 14 .byte $F0,$20,$14
+FE3C: 0A E6 0F .byte $0A,$E6,$0F
+FE3F: 5F 16 8C .byte $5F,$16,$8C
+FE42: 21 77 09 .byte $21,$77,$09
+FE45: 19 7E A7 .byte $19,$7E,$A7
+FE48: 28 06 2A .byte $28,$06,$2A
+FE4B: 12 C7 5F .byte $12,$C7,$5F
+FE4E: 19 72 5A .byte $19,$72,$5A
+FE51: C9 8B 08 .byte $C9,$8B,$08
+FE54: A2 80 8D .byte $A2,$80,$8D
+FE57: 08 08 00 .byte $08,$08,$00
+FE5A: 93 53 52 .byte $93,$53,$52
+FE5D: A9 A1 08 .byte $A9,$A1,$08
+FE60: 27 02 F5 .byte $27,$02,$F5
+FE63: 08 26 81 .byte $08,$26,$81
+FE66: F5 55 31 .byte $F5,$55,$31
+FE69: 00 F5 08 .byte $00,$F5,$08
+FE6C: 3C 96 FF .byte $3C,$96,$FF
+FE6F: AF 10 F7 .byte $AF,$10,$F7
+FE72: 05 09 5D .byte $05,$09,$5D
+FE75: 60 05 09 .byte $60,$05,$09
+FE78: 68 00 05 .byte $68,$00,$05
+FE7B: 95 73 6D .byte $95,$73,$6D
+FE7E: 05 09 7E .byte $05,$09,$7E
+FE81: 5B 0F 54 .byte $5B,$0F,$54
+FE84: 47 69 05 .byte $47,$69,$05
+FE87: 09 89 00 .byte $09,$89,$00
+FE8A: 05 09 94 .byte $05,$09,$94
+FE8D: A8 1D 09 .byte $A8,$1D,$09
+FE90: 8A 59 88 .byte $8A,$59,$88
+FE93: 00 52 27 .byte $00,$52,$27
+FE96: 26 31 3C .byte $26,$31,$3C
+FE99: 00 5D 68 .byte $00,$5D,$68
+FE9C: 73 7E 47 .byte $73,$7E,$47
+FE9F: 89 94 E7 .byte $89,$94,$E7
+FEA2: FD 2A 12 .byte $FD,$2A,$12
+FEA5: C7 FD 19 .byte $C7,$FD,$19
+FEA8: 16 C1 CB .byte $16,$C1,$CB
+FEAB: 7F 28 02 .byte $7F,$28,$02
+FEAE: CB EA FD .byte $CB,$EA,$FD
+FEB1: 72 C8 E6 .byte $72,$C8,$E6
+FEB4: 7F FD 53 .byte $7F,$FD,$53
+FEB7: 09 5F 03 .byte $09,$5F,$03
+FEBA: 0A       .byte $0A
 
 
 ;
