@@ -83,7 +83,13 @@
 ;
 ;   (* TODO - check this)
 ;
-; For the memory layout below, r/w/rw are from the perspective of the PS4
+; For the memory layout below:
+;
+;   - 'r'/'w'/'rw' are from the perspective of the PS4.
+;   - 'Seems unused' means that although the address is used by a routine,
+;     the game didn't seem to be making use of it.
+;   - You'll see a lot of occasions where they use bitfields for things that
+;     don't need them (states which are guaranteed to be mutually exclusive).
 ;
 ; -- Input ports ---------------------------------------------------------------
 ;
@@ -102,7 +108,8 @@
 ;                $80 = bubbled
 ; [$c02](r)  - Beastie 1 Y position
 ; [$c03](r)  - Beastie 1 X position
-; [$c04](r)  - Beastie 1 bonus item has been collected ($00 or $01) (not read by PS4)
+; [$c04](r)  - Beastie 1 bonus item has been collected ($00 or $01)
+;              (not read by PS4)
 ;
 ; [$c05]-[$c08] - Beastie 2 equivalents of [$c01]-[$c04]
 ; [$c09]-[$c0c] - Beastie 3 equivalents of [$c01]-[$c04]
@@ -135,9 +142,9 @@
 ;
 ; ------------------------------------------------------------------------------
 ;
-; [$c24](rw) - Unknown (routine at $f2a7), parallel of [$c25]
-; [$c25](rw) - Unknown (routine at $f347), parallel of [$c24]
-; [$c26](rw) - Seems unused (an output for [$c7e] processor)
+; [$c24](rw) - Seems unused (see PROCESS_C6F)
+; [$c25](rw) - Seems unused (see PROCESS_C70)
+; [$c26](rw) - Seems unused (see PROCESS_C7E)
 ;
 ; -- Beastie output structure --------------------------------------------------
 ;
@@ -184,9 +191,9 @@
 ;
 ; ------------------------------------------------------------------------------
 ;
-; [$c6f](rw) - Unknown (routine at $f2a7) (always reports 0 in my experience)
-; [$c70](rw) - Parallel to [$c6f] (routine at $f347)
-; [$c71](r)  - Unknown (routine at $f8d5) (credits prank?)
+; [$c6f](rw) - Seems unused (see PROCESS_C6F)
+; [$c70](rw) - Seems unused (see PROCESS_C70)
+; [$c71](r)  - Seems unused (see PROCESS_CREDITS_MISCHIEF)
 ;
 ; -- Creepers (see PROCESS_CREEPER_C76) ----------------------------------------
 ;
@@ -196,22 +203,23 @@
 ; [$c75](w)  - Seems unused (fed from creeper for [$c74])
 ; [$c76](r)  - Wind speed   (feeds creeper for [$c77])
 ; [$c77](w)  - Seems unused (fed from creeper for [$c76])
+; [$c80](r)  - Seems unused (feeds creeper for [$c81])
+; [$c81](w)  - Seems unused (fed from creeper for [$c80])
 ;
 ; -- Clock ---------------------------------------------------------------------
 ;
 ; [$c78](rw) - Clock downcounter low byte
 ; [$c79](rw) - Clock downcounter high byte
-; [$c7a](rw) - Clock is active (if not $00)
+; [$c7a](rw) - Clock is active, if not $00
 ; [$c7b](w)  - Clock countdown complete, if PS4 writes $01
 ;
 ; ------------------------------------------------------------------------------
 ; [$c7c](rw) - Which EXTEND bubble the player would be offered if one appeared
 ;              right now
 ; [$c7d](w)  - I/O error reporting. PS4 writes $01 on error.
-; [$c7e](rw) - Seems unused (causes writes to itself, [$c26] and $0054)
+; [$c7e](rw) - Seems unused (see PROCESS_C7E)
 ; [$c7f](r)  - Seems unused (input for dead code at $f216-$f235)
-; [$c80](r)  - Unknown (routine at $f6f1)
-; [$c81](w)  - Unknown (routine at $f6f1)
+
 ; [$c82](w)  - PS4 checksum high byte (game will report error if nonzero)
 ; [$c83](w)  - PS4 checksum low byte  (game will report error if nonzero)
 ; [$c85](w)  - PS4 ready reporting. Main CPU waits for PS4 to write $37 here.
@@ -242,12 +250,12 @@
 ;                $01 - stop accepting
 ;                $ff - start accepting
 ;                otherwise, do not change
-; [$f95](r)  - Unknown (routines at $f2a7, $f347, $f3e3)
+; [$f95](r)  - Seems unused (see PROCESS_C6F, PROCESS_C70, PROCESS_C7E)
 ; [$f96](r)  - Delay after interrupt handler, if $47
 ; [$f97](r)  - Reboot PS4, if $4a
 ; [$f98](r)  - Main CPU is ready, if $47
-; [$f99](w)  - Phony credit event: PS4 writes $01 here on credit bump, but main
-;              CPU doesn't read it
+; [$f99](w)  - Phony credit event
+;              PS4 writes $01 here on credit bumps, but main CPU doesn't read it
 ;
 ;
 ; Memory map
@@ -360,10 +368,14 @@
 ;
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Code!
 
-; Cold start entrypoint
+
+;
+; RESET:
+;
+; Run on boot, pointed to by the reset vector at $fffe
+;
+
 F000: 7E FE BB jmp  $FEBB                    ; Jump to CONFIGURE_MCU
 F003: 8E 00 FF lds  #$00FF                   ; Set stack pointer (already done)
 F006: 0F       sei                           ; Disable interrupts (already done)
@@ -390,7 +402,7 @@ F02C: 26 FA    bne  $F028                    ; Loop
 
 ; Final port configuration and self-test
 F02E: BD F2 36 jsr  $F236                    ; Call RELAY_PORTS
-F031: BD F1 8F jsr  $F18F                    ; Call SET_OUT_AND_12WAY
+F031: BD F1 8F jsr  $F18F                    ; Call SET_OUT_AND_1_2_WAY
 F034: BD F1 96 jsr  $F196                    ; Call TEST_FOR_STUCK_COINS
 F037: BD F2 7A jsr  $F27A                    ; Call CHECKSUM
 F03A: C6 37    ldb  #$37                     ; Store magic number..
@@ -448,11 +460,21 @@ F091: 3B       rti                           ; Done: return to IDLE
 ; PROCESS_PHONY_CREDITS:
 ; (Called from IRQ_HANDLER, and the output compare interrupt vector, $fff4)
 ;
-; This routine tries to track the credits count, but the main CPU ignores all of
-; its output
+; This is an elaborate routine for tracking a credits count, based on incoming
+; coins and the cabinet's service switch. It looks up the pricing table from the
+; DIP switches, manages the coin lockouts to prevent excessive credits, and
+; sends events to the main CPU when the count changes. The one thing it doesn't
+; do is decrement the count when a game starts -- presumably they're expecting
+; the CPU to do that, though that'd entail a critical section issue.
+;
+; Kicker: all of this code is completely inconsequential. The main CPU manages
+; its own credits count, using only the coin information relayed by RELAY_PORTS.
+; Although it does drive the coin lockouts, the PROCESS_COIN_LOCKOUTS routine
+; gets called right after, which overwrites the state of the lockouts using
+; requests from the main CPU.
 ;
 
-; Check that the main CPU is ready for us (see also $f1f8)
+; Check that the main CPU is ready for us (see also INTERRUPT_MAIN_CPU)
 ;
 F092: CE 0F 98 ldx  #$0F98                   ; [$f98] = is main CPU ready for us?
 F095: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
@@ -500,7 +522,7 @@ F0BF: 54       lsrb                          ; ..are in bits 1 and 2
 F0C0: C4 06    andb #$06                     ; Mask out all other bits
 
 ; B is now a table offset. Table entries are two bytes each, which is why we
-; shifted the switch bits to start at bit 1, not bit 0.
+; shifted the switch bits to start at bit 1, not bit 0, and ANDed with 6.
 ;
 F0C2: CE F1 87 ldx  #$F187                   ; Point X to PHONY_COINS_PER_CREDIT_TABLE
 F0C5: 3A       abx                           ; Add the offset
@@ -528,10 +550,10 @@ F0E4: 16       tab                           ; Move it to B, so we can..
 F0E5: CE 0C 1E ldx  #$0C1E                   ; ..commit the count to shared RAM
 F0E8: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 
-; Trigger the credit-inserted event on the phony credit event channel
+; Trigger the credits-changed event on the phony credit event channel
 ;
 F0EB: CE 0F 99 ldx  #$0F99                   ; Into [$f99]..
-F0EE: C6 01    ldb  #$01                     ; ..write $01 (a credit bump happened)
+F0EE: C6 01    ldb  #$01                     ; ..write $01
 F0F0: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 
 ;
@@ -591,7 +613,7 @@ F148: CE 0C 1E ldx  #$0C1E                   ; We'll commit it back to [$c1e]
 F14B: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 
 F14E: CE 0F 99 ldx  #$0F99                   ; Now commit to the phony credit event channel..
-F151: C6 01    ldb  #$01                     ; ..the value $01 (a credit bump happened)
+F151: C6 01    ldb  #$01                     ; ..the value $01 (a credit change happened)
 F153: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 
 ;
@@ -642,8 +664,8 @@ F16E: 39       rts
 ;           A   = a byte where we only care about the MSB
 ;           (X) = last frame's value of A
 ;
-; On exit,  (X)   = this frame's value of A            (for incoming val. of X)
-;           (X+1) = How MSB of A has changed           (for incoming val. of X)
+; On exit,  (X)   = this frame's value of A  (for incoming val. of X)
+;           (X+1) = How MSB of A has changed (for incoming val. of X)
 ;                   $00 = 1 last frame, 0 this frame
 ;                   $01 = 0 last frame, 0 this frame
 ;                   $02 = 1 last frame, 1 this frame
@@ -689,9 +711,9 @@ F18D: 01 01    .byte $01,$01                 ; 1 coin  1 credit
 
 
 ;
-; SET_OUT_AND_12WAY:
+; SET_OUT_AND_1_2_WAY:
 ;
-; Called from init. Configures the OUT and 1/2 WAY outputs to coin mechs.
+; Called from RESET. Configures the OUT and 1/2 WAY outputs to coin mechs.
 ; 
 
 F18F: 86 20    lda  #$20                     ; $20 = OUT and 1/2 WAY bits
@@ -953,9 +975,11 @@ F2A6: 39       rts
 ; (Called from IRQ_HANDLER)
 ;
 ; Does work depending on value of [$c6f], which in a playthrough of the game was
-; never written to by the CPU outside of the RAM self-test.
+; never written to by the main CPU outside of the RAM self-test.
 ;
-; Mirrored in $f347, with different constants
+; When active, also reads and writes [$c24], and $0052
+;
+; Mirrored in PROCESS_C70, with different constants
 ;
 
 F2A7: CE 0C 6F ldx  #$0C6F                   ; We'll be reading [$c6f]
@@ -1061,7 +1085,11 @@ F346: 02       .byte $02
 ; PROCESS_C70:
 ; (Called from IRQ_HANDLER)
 ;
-; Appears to parallel the routine at $f2a7, but for [$c70] instead of [$c6f]
+; Appears parallel to PROCESS_C6F, but with:
+;   - [$c70] instead of [$c6f]
+;   - [$c25] instead of [$c24]
+;   - $0053  instead of $0052
+;
 ; The CPU wasn't seen activating this one during a playthrough either.
 ;
 
