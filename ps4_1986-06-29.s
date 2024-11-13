@@ -176,9 +176,9 @@
 ; [$c6f](rw) - Unknown (routine at $f2a7) (always reports 0 in my experience)
 ; [$c70](rw) - Parallel to [$c6f] (routine at $f347)
 ; [$c71](r)  - Unknown (routine at $f8d5) (credits prank?)
-
+;
 ; -- Creepers (see PROCESS_CREEPER_C76) ----------------------------------------
-
+;
 ; [$c72](r)  - Seems unused (feeds creeper for [$c73])
 ; [$c73](w)  - Seems unused (fed from creeper for [$c72])
 ; [$c74](r)  - Seems unused (feeds creeper for [$c75])
@@ -192,7 +192,7 @@
 ; [$c79](rw) - Clock downcounter high byte
 ; [$c7a](rw) - Clock is active (if not $00)
 ; [$c7b](w)  - Clock countdown complete, if PS4 writes $01
-
+;
 ; ------------------------------------------------------------------------------
 ; [$c7c](rw) - Which EXTEND bubble the player would be offered if one appeared
 ;              right now
@@ -224,6 +224,7 @@
 ; [$f91](r)  - index ptr         for translator at $f977
 ; [$f92](r)  - table ptr         for translator at $f977
 ; [$f93](r)  - output offset ptr for translator at $f977
+;
 ; ------------------------------------------------------------------------------
 ;
 ; [$f94](r)  - Should coin lockouts accept more coins?
@@ -233,7 +234,7 @@
 ; [$f95](r)  - Unknown (routines at $f2a7, $f347, $f3e3)
 ; [$f96](r)  - Delay after interrupt handler, if $47
 ; [$f97](r)  - Reboot PS4, if $4a
-; [$f98](r)  - Generate main CPU interrupts, if $47
+; [$f98](r)  - Main CPU is ready, if $47
 ; [$f99](w)  - Phony credit event: PS4 writes $01 here on credit bump, but main
 ;              CPU doesn't read it
 ;
@@ -416,11 +417,11 @@ F064: BD F6 CB jsr  $F6CB                    ; Call PROCESS_CREEPER_C76
 F067: BD F6 F1 jsr  $F6F1                    ; Call PROCESS_CREEPER_C80
 F06A: BD F8 99 jsr  $F899                    ; Call PROCESS_CLOCK_ITEM
 F06D: BD F8 D5 jsr  $F8D5                    ; Call PROCESS_CREDITS_MISCHIEF
-F070: BD F8 F1 jsr  $F8F1                    ; Call BUMP_EXTEND
+F070: BD F8 F1 jsr  $F8F1                    ; Call PROCESS_EXTEND_ROTATION
 F073: BD F9 03 jsr  $F903                    ; Call PROCESS_TRANSLATOR_F88
 F076: BD F9 3D jsr  $F93D                    ; Call PROCESS_TRANSLATOR_F8C
 F079: BD F9 77 jsr  $F977                    ; Call PROCESS_TRANSLATOR_F90
-F07C: BD F2 99 jsr  $F299                    ; Call LISTEN_FOR_RESET
+F07C: BD F2 99 jsr  $F299                    ; Call PROCESS_RESET_REQUEST
 
 F07F: CE 0F 96 ldx  #$0F96                   ; Read [$f96]
 F082: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
@@ -434,8 +435,7 @@ F091: 3B       rti                           ; Done: return to IDLE
 
 ;
 ; PROCESS_PHONY_CREDITS:
-; (Called from the main interrupt handler, and the output compare interrupt
-; vector, $fff4)
+; (Called from IRQ_HANDLER, and the output compare interrupt vector, $fff4)
 ;
 ; This routine tries to track the credits count, but the main CPU ignores all of
 ; its output
@@ -443,11 +443,11 @@ F091: 3B       rti                           ; Done: return to IDLE
 
 ; Check that the main CPU is ready for us (see also $f1f8)
 ;
-F092: CE 0F 98 ldx  #$0F98
+F092: CE 0F 98 ldx  #$0F98                   ; [$f98] = is main CPU ready for us?
 F095: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F098: C1 47    cmpb #$47
-F09A: 27 01    beq  $F09D
-F09C: 39       rts  
+F098: C1 47    cmpb #$47                     ; Look for magic number
+F09A: 27 01    beq  $F09D                    ; Process if found
+F09C: 39       rts                           ; Return otherwise
 
 ; Isolate the credit-related inputs from port 1
 ;
@@ -715,10 +715,10 @@ F1AF: 39       rts
 ;
 ; PROCESS_COIN_LOCKOUTS:
 ;
-; A routine called from the main interrupt handler. Receives signals from the
-; main CPU to enable or disable the coin lockouts. The game engages the lockouts
-; once the ninth credit has been inserted, disengaging it as soon as the game
-; then starts.
+; A routine called from IRQ_HANDLER. Receives signals from the main CPU to
+; enable or disable the coin lockouts. The game engages the lockouts once the
+; ninth credit has been inserted, disengaging it as soon as the game then
+; starts.
 ;
 
 F1B0: CE 0F 94 ldx  #$0F94                   ; [$f94] is coin lockout instruction
@@ -795,9 +795,8 @@ F1F7: 39       rts
 ;
 ; INTERRUPT_MAIN_CPU:
 ;
-; The first routine called from the main interrupt handler. This generates an
-; interrupt on the main CPU, but only if the magic number $47 has been written
-; to [$f98].
+; The first routine called from IRQ_HANDLER. This generates an interrupt on the
+; main CPU, but only if the magic number $47 has been written to [$f98].
 ;
 ; Without this routine, the main game would be frozen.
 ;
@@ -850,8 +849,7 @@ F235: 39       rts
 
 ;
 ; RELAY_PORTS:
-;
-; A routine called from the main interrupt handler and at startup
+; (Called from IRQ_HANDLER and at startup)
 ;
 ; Copies the cabinet interface (I/O pins on port 1) and player controls/DIP
 ; switches (memory-mapped via the P-CPU bus) to shared RAM locations where the
@@ -922,8 +920,8 @@ F297: 08 38    .byte $08,$38
 
 
 ;
-; LISTEN_FOR_RESET:
-; (Called from the main interrupt handler)
+; PROCESS_RESET_REQUEST:
+; (Called from IRQ_HANDLER)
 ;
 ; Begins a warm boot of the PS4 if [$f97] == $4a
 ;
@@ -941,10 +939,10 @@ F2A6: 39       rts
 
 ;
 ; PROCESS_C6F:
-; (Called from the main interrupt handler)
+; (Called from IRQ_HANDLER)
 ;
-; Does work depending on value of [$c6f]. I don't know what that's for: in
-; practice, I've only ever seen it report zero.
+; Does work depending on value of [$c6f], which in a playthrough of the game was
+; never written to by the CPU outside of the RAM self-test.
 ;
 ; Mirrored in $f347, with different constants
 ;
@@ -1045,106 +1043,89 @@ F346: 02       .byte $02
 
 ;
 ; PROCESS_C70:
-; (Called from the main interrupt handler)
+; (Called from IRQ_HANDLER)
 ;
 ; Appears to parallel the routine at $f2a7, but for [$c70] instead of [$c6f]
+; The CPU wasn't seen activating this one during a playthrough either.
 ;
 
 F347: CE 0C 70 ldx  #$0C70                   ; Other routine used [$c6f]
-F34A: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-
-F34D: C1 01    cmpb #$01                     ; If $01..
-F34F: 27 23    beq  $F374                    ;       ..jump to $f374
-F351: C1 02    cmpb #$02                     ; If $02..
-F353: 27 44    beq  $F399                    ;       ..jump to $f399
-F355: C1 04    cmpb #$04                     ; If $04..
-F357: 27 5D    beq  $F3B6                    ;       ..jump to $f3b6
-F359: C1 08    cmpb #$08                     ; If $08..
-F35B: 27 72    beq  $F3CF                    ;       ..jump to $f3cf
-
-; [$c70] wasn't 1, 2, 4 or 8.
-; If [$f95] != $42 (66), skip to return
-F35D: CE 0F 95 ldx  #$0F95
-F360: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F363: C1 42    cmpb #$42
-F365: 26 0C    bne  $F373
-
-; [$f95] was $42. Read [$c25]. If it doesn't match contents of addr $0053, push
-; the accumulator onto the stack and then try rts. Which would be sure to fail
-; because the top of the stack just had the accumulator pushed to it. So this
-; is pretty puzzling.
-;
-F367: CE 0C 25 ldx  #$0C25
-F36A: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F36D: F1 00 53 cmpb $0053
-F370: 27 01    beq  $F373
-F372: 36       psha 
-F373: 39       rts  
-
-; Handles [$c70] being 1
-F374: CE 00 01 ldx  #$0001
-F377: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F37A: 54       lsrb 
-F37B: 54       lsrb 
-F37C: 54       lsrb 
-F37D: 54       lsrb 
-F37E: C4 03    andb #$03
-F380: CE F3 43 ldx  #$F343                   ; A small table
-F383: 3A       abx  
-F384: A6 00    lda  $00,x
-F386: 16       tab  
-F387: F7 00 53 stb  $0053
-F38A: CE 0C 25 ldx  #$0C25
-F38D: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
-F390: CE 0C 70 ldx  #$0C70
-F393: C6 00    ldb  #$00
-F395: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
-F398: 39       rts  
-
-; Handles [$c70] being 2
-F399: CE 0C 25 ldx  #$0C25
-F39C: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F39F: C1 0A    cmpb #$0A
-F3A1: 27 0A    beq  $F3AD
-F3A3: 5C       incb 
-F3A4: F7 00 53 stb  $0053
-F3A7: CE 0C 25 ldx  #$0C25
-F3AA: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
-F3AD: CE 0C 70 ldx  #$0C70
-F3B0: C6 00    ldb  #$00
-F3B2: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
-F3B5: 39       rts  
-
-; Handles [$c70] being 4
-F3B6: CE 0C 25 ldx  #$0C25
-F3B9: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F3BC: 5A       decb 
-F3BD: F7 00 53 stb  $0053
-F3C0: CE 0C 25 ldx  #$0C25
-F3C3: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
-F3C6: CE 0C 70 ldx  #$0C70
-F3C9: C6 00    ldb  #$00
-F3CB: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
-F3CE: 39       rts  
-
-; Handles [$c70] being 8
-F3CF: C6 0A    ldb  #$0A
-F3D1: F7 00 53 stb  $0053
-F3D4: CE 0C 25 ldx  #$0C25
-F3D7: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
-F3DA: CE 0C 70 ldx  #$0C70
-F3DD: C6 00    ldb  #$00
-F3DF: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
-F3E2: 39       rts  
+F34A: BD F1 BF jsr  $F1BF                    ; (See routine at $f2a7)
+F34D: C1 01    cmpb #$01                     ; (See routine at $f2a7)
+F34F: 27 23    beq  $F374                    ; (See routine at $f2a7)
+F351: C1 02    cmpb #$02                     ; (See routine at $f2a7)
+F353: 27 44    beq  $F399                    ; (See routine at $f2a7)
+F355: C1 04    cmpb #$04                     ; (See routine at $f2a7)
+F357: 27 5D    beq  $F3B6                    ; (See routine at $f2a7)
+F359: C1 08    cmpb #$08                     ; (See routine at $f2a7)
+F35B: 27 72    beq  $F3CF                    ; (See routine at $f2a7)
+F35D: CE 0F 95 ldx  #$0F95                   ; (See routine at $f2a7)
+F360: BD F1 BF jsr  $F1BF                    ; (See routine at $f2a7)
+F363: C1 42    cmpb #$42                     ; (See routine at $f2a7)
+F365: 26 0C    bne  $F373                    ; (See routine at $f2a7)
+F367: CE 0C 25 ldx  #$0C25                   ; Other routine used [$c24]
+F36A: BD F1 BF jsr  $F1BF                    ; (See routine at $f2a7)
+F36D: F1 00 53 cmpb $0053                    ; Other routine used $0052
+F370: 27 01    beq  $F373                    ; (See routine at $f2a7)
+F372: 36       psha                          ; (See routine at $f2a7)
+F373: 39       rts                           ; (See routine at $f2a7)
+F374: CE 00 01 ldx  #$0001                   ; (See routine at $f2a7)
+F377: BD F1 BF jsr  $F1BF                    ; (See routine at $f2a7)
+F37A: 54       lsrb                          ; (See routine at $f2a7)
+F37B: 54       lsrb                          ; (See routine at $f2a7)
+F37C: 54       lsrb                          ; (See routine at $f2a7)
+F37D: 54       lsrb                          ; (See routine at $f2a7)
+F37E: C4 03    andb #$03                     ; (See routine at $f2a7)
+F380: CE F3 43 ldx  #$F343                   ; (See routine at $f2a7)
+F383: 3A       abx                           ; (See routine at $f2a7)
+F384: A6 00    lda  $00,x                    ; (See routine at $f2a7)
+F386: 16       tab                           ; (See routine at $f2a7)
+F387: F7 00 53 stb  $0053                    ; Other routine used $0052
+F38A: CE 0C 25 ldx  #$0C25                   ; Other routine used [$c24]
+F38D: BD F1 DB jsr  $F1DB                    ; (See routine at $f2a7)
+F390: CE 0C 70 ldx  #$0C70                   ; Other routine used [$c6f]
+F393: C6 00    ldb  #$00                     ; (See routine at $f2a7)
+F395: BD F1 DB jsr  $F1DB                    ; (See routine at $f2a7)
+F398: 39       rts                           ; (See routine at $f2a7)
+F399: CE 0C 25 ldx  #$0C25                   ; Other routine used [$c24]
+F39C: BD F1 BF jsr  $F1BF                    ; (See routine at $f2a7)
+F39F: C1 0A    cmpb #$0A                     ; (See routine at $f2a7)
+F3A1: 27 0A    beq  $F3AD                    ; (See routine at $f2a7)
+F3A3: 5C       incb                          ; (See routine at $f2a7)
+F3A4: F7 00 53 stb  $0053                    ; Other routine used $0052
+F3A7: CE 0C 25 ldx  #$0C25                   ; Other routine used [$c24]
+F3AA: BD F1 DB jsr  $F1DB                    ; (See routine at $f2a7)
+F3AD: CE 0C 70 ldx  #$0C70                   ; Other routine used [$c6f]
+F3B0: C6 00    ldb  #$00                     ; (See routine at $f2a7)
+F3B2: BD F1 DB jsr  $F1DB                    ; (See routine at $f2a7)
+F3B5: 39       rts                           ; (See routine at $f2a7)
+F3B6: CE 0C 25 ldx  #$0C25                   ; Other routine used [$c24]
+F3B9: BD F1 BF jsr  $F1BF                    ; (See routine at $f2a7)
+F3BC: 5A       decb                          ; (See routine at $f2a7)
+F3BD: F7 00 53 stb  $0053                    ; Other routine used $0052
+F3C0: CE 0C 25 ldx  #$0C25                   ; Other routine used [$c24]
+F3C3: BD F1 DB jsr  $F1DB                    ; (See routine at $f2a7)
+F3C6: CE 0C 70 ldx  #$0C70                   ; Other routine used [$c6f]
+F3C9: C6 00    ldb  #$00                     ; (See routine at $f2a7)
+F3CB: BD F1 DB jsr  $F1DB                    ; (See routine at $f2a7)
+F3CE: 39       rts                           ; (See routine at $f2a7)
+F3CF: C6 0A    ldb  #$0A                     ; (See routine at $f2a7)
+F3D1: F7 00 53 stb  $0053                    ; Other routine used $0052
+F3D4: CE 0C 25 ldx  #$0C25                   ; Other routine used [$c24]
+F3D7: BD F1 DB jsr  $F1DB                    ; (See routine at $f2a7)
+F3DA: CE 0C 70 ldx  #$0C70                   ; Other routine used [$c6f]
+F3DD: C6 00    ldb  #$00                     ; (See routine at $f2a7)
+F3DF: BD F1 DB jsr  $F1DB                    ; (See routine at $f2a7)
+F3E2: 39       rts                           ; (See routine at $f2a7)
 
 
 ;
 ; PROCESS_C7E:
-; (Called from the main interrupt handler)
+; (Called from IRQ_HANDLER)
 ;
 ; Sets [$c26] and $0054 based on value of [$c7e]. Don't know what this was
-; intended for, as main CPU never attempts a write to [$c7e], nor a read from
-; [$c26] (outside of bootup RAM test).
+; intended for, as, in my experience, the main CPU never attempts a write to
+; [$c7e], nor a read from [$c26] (outside of bootup RAM test).
 ;
 ; $0054 also seems to be used in PROCESS_CREDITS_MISCHIEF.
 ;
@@ -1160,7 +1141,8 @@ F3E2: 39       rts
 ;                  $40 |                        $65 |              $00
 ;                other |                  unchanged |        unchanged
 ;
-; In the 'other' case, will crash if [$f95] if $42 and [$c26] doesn't match $0054
+; In the 'other' case, will crash if [$f95] is $42 and [$c26] doesn't match
+; contents of $0054
 ;
 
 F3E3: CE 0C 7E ldx  #$0C7E
@@ -1263,10 +1245,10 @@ F48D: 20 C4    bra  $F453                    ; Common ending
 
 ;
 ; PROCESS_P1_BEASTIES:
-; (Called from the main interrupt handler)
+; (Called from IRQ_HANDLER)
 ;
-; This is for player 1. Note that the code in $f585 onwards does player 2,
-; and is virtually identical.
+; This is for player 1. Note that the code in $f585 onwards does player 2, and
+; is virtually identical.
 ;
 
 F48F: CE 0C 5F ldx  #$0C5F                   ; [$c5f] = player 1 liveness
@@ -1483,7 +1465,7 @@ F582: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
 
 ;
 ; PROCESS_P2_BEASTIES:
-; (Called from the main interrupt handler)
+; (Called from IRQ_HANDLER)
 ;
 ; This is for player 2. Note that the code in $f48f onwards does player 1,
 ; and is virtually identical, the only differences being a few of the pointers
@@ -1621,7 +1603,7 @@ F67C: 7E F1 DB jmp  $F1DB                    ; (See routine at $f48f)
 
 ;
 ; PROCESS_CREEPER_C72_C74:
-; (Called from the main interrupt handler)
+; (Called from IRQ_HANDLER)
 ;
 ; Two creepers (see PROCESS_CREEPER_C76) chained together. The first uses:
 ;   - table source [$c72]
@@ -1673,7 +1655,7 @@ F6C8: 7E F1 DB jmp  $F1DB                    ; (See routine at $f6cb)
 
 ;
 ; PROCESS_CREEPER_C76:
-; (Called from the main interrupt handler)
+; (Called from IRQ_HANDLER)
 ;
 ; A creeper using:
 ;   - table source [$c76]
@@ -1717,7 +1699,7 @@ F6EE: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
 
 ;
 ; PROCESS_CREEPER_C80:
-; (Called from the main interrupt handler)
+; (Called from IRQ_HANDLER)
 ;
 ; A creeper (see PROCESS_CREEPER_C76) using:
 ;   - table source [$c80]
@@ -2239,13 +2221,13 @@ F898: FF       .byte $FF
 
 ;
 ; PROCESS_CLOCK_ITEM:
-; (Called from the main interrupt handler)
+; (Called from IRQ_HANDLER)
 ;
 ; There's a special item in the game which looks like a clock and pauses time
 ; for the beasties. This routine handles its countdown.
 ;
 
-F899: CE 0C 7A ldx  #$0C7A
+F899: CE 0C 7A ldx  #$0C7A                   ; [$c7a] = is clock active?
 F89C: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
 F89F: 5D       tstb                          ; Is it nonzero?
 F8A0: 26 01    bne $F8A3                     ; If so, handle
@@ -2279,7 +2261,7 @@ F8D2: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
 
 ;
 ; PROCESS_CREDITS_MISCHIEF:
-; (Called from the main interrupt handler)
+; (Called from IRQ_HANDLER)
 ;
 ; Sets the phony credits count to 42 if [$c71] is $0d, and $0054 is $0c
 ;
@@ -2309,8 +2291,8 @@ F8F0: 39       rts
 
 
 ;
-; BUMP_EXTEND:
-; (Called from the main interrupt handler)
+; PROCESS_EXTEND_ROTATION:
+; (Called from IRQ_HANDLER)
 ;
 ; Reads [$c7c], increments it modulo 6, and writes it back.
 ;
@@ -2329,7 +2311,7 @@ F900: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
 
 ;
 ; PROCESS_TRANSLATOR_F88:
-; (Called from the main interrupt handler)
+; (Called from IRQ_HANDLER)
 ;
 ; This is one of three 'translator's that run each frame. Their purpose is to
 ; look up a value in an, effectively, 1280-byte block of random data, and to
@@ -2338,7 +2320,7 @@ F900: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
 ;
 ; Given constants:
 ;
-;   - status            = $f88
+;   - status ptr        = $f88
 ;   - index ptr         = $f89
 ;   - table ptr         = $f8a
 ;   - output offset ptr = $f8b
@@ -2364,15 +2346,15 @@ F900: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
 
 ; Return immediately if value of [status] ([$f88] in this case) isn't $01
 ;
-F903: CE 0F 88 ldx  #$0F88
+F903: CE 0F 88 ldx  #$0F88                   ; Put status ptr in X
 F906: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F909: C1 01    cmpb #$01
-F90B: 27 01    beq  $F90E
-F90D: 39       rts  
+F909: C1 01    cmpb #$01                     ; Is it $01?
+F90B: 27 01    beq  $F90E                    ; If so, proceed
+F90D: 39       rts                           ; Otherwise, we're done
 
 ; Fetch the table number from [table ptr] ([$f8a] in this case)
 ;
-F90E: CE 0F 8A ldx  #$0F8A
+F90E: CE 0F 8A ldx  #$0F8A                   ; Put table ptr in X
 F911: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
 F914: CE F9 B1 ldx  #$F9B1                   ; Use TRANSLATOR_TABLES as base pointer
 F917: 3A       abx                           ; Add B to it..
@@ -2382,7 +2364,7 @@ F91B: 3C       pshx                          ; Stash table pointer
 
 ; Fetch the index within that table from [index ptr] ([$f89] in this case)
 ;
-F91C: CE 0F 89 ldx  #$0F89
+F91C: CE 0F 89 ldx  #$0F89                   ; Put index ptr in X
 F91F: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
 F922: 38       pulx                          ; Retrieve stashed table pointer
 F923: 3A       abx                           ; Add index to table base
@@ -2391,32 +2373,32 @@ F926: 37       pshb                          ; Then stash it
 
 ; Fetch the output offset from [output offset ptr] ([$f8b] in this case)
 ;
-F927: CE 0F 8B ldx  #$0F8B
+F927: CE 0F 8B ldx  #$0F8B                   ; Put output offset ptr in X
 F92A: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
 
 ; Store the looked-up table value in [output base + fetched output offset]
 ; ([$c88 + fetched output offset] in this case)
 ;
-F92D: CE 0C 88 ldx  #$0C88
-F930: 3A       abx  
-F931: 33       pulb 
+F92D: CE 0C 88 ldx  #$0C88                   ; Put output base in X
+F930: 3A       abx                           ; Add the offset
+F931: 33       pulb                          ; Retrieved stashed value
 F932: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 
 ; Write $ff to [status] ([$f88] in this case), presumably signaling to the main
 ; CPU that the processing is done, and preventing this re-running next time
 ;
-F935: C6 FF    ldb  #$FF
-F937: CE 0F 88 ldx  #$0F88
+F935: C6 FF    ldb  #$FF                     ; '$ff' means fulfilled
+F937: CE 0F 88 ldx  #$0F88                   ; Use status ptr for store
 F93A: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
 
 
 ;
 ; PROCESS_TRANSLATOR_F8C:
-; (Called from the main interrupt handler)
+; (Called from IRQ_HANDLER)
 ;
 ; This is a translator (see PROCESS_TRANSLATOR_F88) with constants:
 ;
-;   - status            = $f8c
+;   - status ptr        = $f8c
 ;   - index ptr         = $f8d
 ;   - table ptr         = $f8e
 ;   - output offset ptr = $f8f
@@ -2454,11 +2436,11 @@ F974: 7E F1 DB jmp  $F1DB                    ; (See routine at $f903)
 
 ;
 ; PROCESS_TRANSLATOR_F90:
-; (Called from the main interrupt handler)
+; (Called from IRQ_HANDLER)
 ;
 ; This is a translator (see PROCESS_TRANSLATOR_F88) with constants:
 ;
-;   - status            = $f90
+;   - status ptr        = $f90
 ;   - index ptr         = $f91
 ;   - table ptr         = $f92
 ;   - output offset ptr = $f93
@@ -2511,7 +2493,6 @@ F9B7: FC BB    .word $FCBB                   ; TRANSLATOR_TABLE_3
 F9B9: FD BB    .word $FDBB                   ; TRANSLATOR_TABLE_4
 
 ; TRANSLATOR_TABLE_0
-;
 F9BB: 17 3A    .byte $17,$3A
 F9BD: 51 E0    .byte $51,$E0
 F9BF: FE C3    .byte $FE,$C3
@@ -3338,7 +3319,7 @@ FFD5: 97 02    sta  $02                      ; Port 1 data register
 FFD7: 97 03    sta  $03                      ; Port 2 data register
 FFD9: 97 07    sta  $07                      ; Port 4 data register
 FFDB: 97 06    sta  $06                      ; Port 3 data register
-FFDD: 20 FE    bra  $FFDD                    ; loop forever
+FFDD: 20 FE    bra  $FFDD                    ; Loop forever
 
 
 ; An ASCII string, "BR1O 29.JUN,1986 "
