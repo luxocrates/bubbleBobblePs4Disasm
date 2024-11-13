@@ -409,7 +409,7 @@ F034: BD F1 96 jsr  $F196                    ; Call TEST_FOR_STUCK_COINS
 F037: BD F2 7A jsr  $F27A                    ; Call CHECKSUM
 F03A: C6 37    ldb  #$37                     ; Store magic number..
 F03C: CE 0C 85 ldx  #$0C85                   ; ..into [$c85] to report that PS4 has booted
-F03F: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F03F: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F042: 0E       cli                           ; Enable interrupts
 
 ;
@@ -449,7 +449,7 @@ F079: BD F9 77 jsr  $F977                    ; Call PROCESS_TRANSLATOR_F90
 F07C: BD F2 99 jsr  $F299                    ; Call PROCESS_RESET_REQUEST
 
 F07F: CE 0F 96 ldx  #$0F96                   ; Read [$f96]
-F082: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F082: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F085: C1 47    cmpb #$47                     ; If $47..
 F087: 27 08    beq  $F091                    ;      ..skip the cycle burn
 F089: CC 01 70 ldd  #$0170                   ; Burn cycles: iterate through $170 (368) empty loops
@@ -479,7 +479,7 @@ F091: 3B       rti                           ; Done: return to IDLE
 ; Check that the main CPU is ready for us (see also INTERRUPT_MAIN_CPU)
 ;
 F092: CE 0F 98 ldx  #$0F98                   ; [$f98] = is main CPU ready for us?
-F095: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F095: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F098: C1 47    cmpb #$47                     ; Look for magic number
 F09A: 27 01    beq  $F09D                    ; Process if found
 F09C: 39       rts                           ; Return otherwise
@@ -545,18 +545,18 @@ F0D6: 7F 00 48 clr  $0048                    ; If so, reset the phony count
 F0D9: A6 01    lda  $01,x                    ; Load the credits value from the table
 F0DB: 36       psha                          ; Stash it
 F0DC: CE 0C 1E ldx  #$0C1E                   ; Read phony credits count
-F0DF: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F0DF: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F0E2: 32       pula                          ; Retrieve stashed credits value
 F0E3: 1B       aba                           ; Add to the phony credits count
 F0E4: 16       tab                           ; Move it to B, so we can..
 F0E5: CE 0C 1E ldx  #$0C1E                   ; ..commit the count to shared RAM
-F0E8: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F0E8: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 
 ; Trigger the credits-changed event on the phony credit event channel
 ;
 F0EB: CE 0F 99 ldx  #$0F99                   ; Into [$f99]..
 F0EE: C6 01    ldb  #$01                     ; ..write $01
-F0F0: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F0F0: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 
 ;
 ; COIN B handler
@@ -605,25 +605,25 @@ F138: 81 00    cmpa #$00                     ; Falling edge?
 F13A: 26 1A    bne  $F156                    ; If not, skip to lockouts handler
 
 F13C: CE 0C 1E ldx  #$0C1E                   ; Load phony credits count
-F13F: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F13F: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F142: 86 08    lda  #$08                     ; Compare 8..
 F144: 11       cba                           ; ..to the phony credits count
 F145: 25 1A    bcs  $F161                    ; If count >= 9, do ENABLE_COIN_LOCKOUTS and return
 
 F147: 5C       incb                          ; Increment the phony credits count
 F148: CE 0C 1E ldx  #$0C1E                   ; We'll commit it back to [$c1e]
-F14B: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F14B: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 
 F14E: CE 0F 99 ldx  #$0F99                   ; Now commit to the phony credit event channel..
 F151: C6 01    ldb  #$01                     ; ..the value $01 (a credit change happened)
-F153: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F153: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 
 ;
 ; Lockouts handler
 ;
 
 F156: CE 0C 1E ldx  #$0C1E                   ; Load phony credits count
-F159: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F159: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F15C: 86 08    lda  #$08                     ; Compared to 8..
 F15E: 11       cba                           ; ..is it larger?
 F15F: 24 07    bcc  $F168                    ; If not, do DISABLE_COIN_LOCKOUTS and return
@@ -700,10 +700,10 @@ F186: 39       rts
 ;
 ; PHONY_COINS_PER_CREDIT_TABLE:
 ;
-; I can't quite explain the ordering here: it doesn't seem to match the DIPs.
-; Although this isn't the _real_ table: the main CPU completely ignores the
-; credits-counting work that the PS4 is doing. Maybe they changed it the
-; assignments?
+; I can't quite explain the ordering here: it doesn't seem to match the
+; published DIP settings. Although this isn't the _real_ table: the main CPU
+; completely ignores the credits-counting work that the PS4 is doing. Maybe they
+; changed the assignments?
 ;
 
 F187: 02 01    .byte $02,$01                 ; 2 coins 1 credit
@@ -743,7 +743,7 @@ F1A6: 39       rts
 ;
 F1A7: CE 0C 7D ldx  #$0C7D                   ; [$c7d] is I/O error reporting channel
 F1AA: C6 01    ldb  #$01                     ; Magic number
-F1AC: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F1AC: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F1AF: 39       rts  
 
 
@@ -757,7 +757,7 @@ F1AF: 39       rts
 ;
 
 F1B0: CE 0F 94 ldx  #$0F94                   ; [$f94] is coin lockout instruction
-F1B3: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F1B3: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F1B6: C1 01    cmpb #$01                     ; If $01..
 F1B8: 27 A7    beq  $F161                    ;       ..do ENABLE_COIN_LOCKOUTS and return
 F1BA: C1 FF    cmpb #$FF                     ; If $ff..
@@ -766,11 +766,14 @@ F1BE: 39       rts
 
 
 ;
-; READ_RAM_OR_INPUTS:
-; Reads a byte from address X of the shared RAM interface into reg B
+; P_CPU_BUS_READ:
 ;
-; This is the sole function through which all shared RAM reads flow.
-; Note similarities to WRITE_RAM.
+; Reads a byte from address X of the P-CPU bus into reg B
+;
+; This is the sole function through which all shared RAM reads flow, as well as
+; the input controls and DIP switches.
+;
+; Note similarities to P_CPU_BUS_WRITE.
 ;
 
 ; Set port 1 bit 7 high. This signals to the IC12 PAL that we'll be doing a read.
@@ -800,11 +803,12 @@ F1DA: 39       rts
 
 
 ;
-; WRITE_RAM:
-; Writes a byte (in reg B) to shared RAM (at address X)
+; P_CPU_BUS_WRITE:
+;
+; Writes a byte (in reg B) to the P-CPU bus (at address X)
 ;
 ; This is the sole function through which all shared RAM writes flow.
-; Note similarities to READ_RAM_OR_INPUTS.
+; Note similarities to P_CPU_BUS_READ.
 ;
 
 ; Clear port 1 bit 7. This signals to the IC12 PAL that we'll be doing a write.
@@ -839,7 +843,7 @@ F1F7: 39       rts
 ;
 
 F1F8: CE 0F 98 ldx  #$0F98                   ; Read [$f98]
-F1FB: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F1FB: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F1FE: C1 47    cmpb #$47                     ; Is it the magic number?
 F200: 27 01    beq  $F203                    ; Proceed with the interrupt
 F202: 39       rts                           ; Otherwise, we're done
@@ -867,7 +871,7 @@ F215: 39       rts
 ;
 F216: 39       rts  
 F217: CE 0C 7F ldx  #$0C7F
-F21A: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F21A: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F21D: F1 00 4C cmpb $004C
 F220: 07       tpa  
 F221: F7 00 4C stb  $004C
@@ -893,31 +897,31 @@ F235: 39       rts
 
 F236: D6 02    ldb  $02                      ; Read PS4 port 1 data
 F238: CE 0C 1F ldx  #$0C1F                   ; Relay it to [$c1f]
-F23B: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F23B: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 
 F23E: CE 00 00 ldx  #$0000                   ; Read player controls/DIPs 0
-F241: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F241: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F244: F7 00 4E stb  $004E                    ; Cache it in $004e
 F247: CE 0C 20 ldx  #$0C20                   ; Relay it to [$c20]
-F24A: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F24A: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 
 F24D: CE 00 01 ldx  #$0001                   ; Read player controls/DIPs 1
-F250: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F250: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F253: F7 00 4F stb  $004F                    ; Cache it in $004f
 F256: CE 0C 21 ldx  #$0C21                   ; Relay it to [$c21]
-F259: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F259: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 
 F25C: CE 00 02 ldx  #$0002                   ; Read player controls/DIPs 2
-F25F: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F25F: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F262: F7 00 50 stb  $0050                    ; Cache it in $0050
 F265: CE 0C 22 ldx  #$0C22                   ; Relay it to [$c22]
-F268: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F268: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 
 F26B: CE 00 03 ldx  #$0003                   ; Read player controls/DIPs 3
-F26E: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F26E: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F271: F7 00 51 stb  $0051                    ; Cache it in $0051
 F274: CE 0C 23 ldx  #$0C23                   ; Relay it to [$c23]
-F277: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
+F277: 7E F1 DB jmp  $F1DB                    ; Call P_CPU_BUS_WRITE and return
 
 
 ;
@@ -940,10 +944,10 @@ F286: 26 F7    bne  $F27F                    ; If not, iterate
 
 F288: 36       psha                          ; Stash A (one byte of the checksum)
 F289: CE 0C 83 ldx  #$0C83                   ; Store the other byte to [$c83]
-F28C: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F28C: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F28F: 33       pulb                          ; Retrieve stashed A
 F290: CE 0C 82 ldx  #$0C82                   ; Store it in [$c82]
-F293: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F293: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F296: 39       rts  
 ;
 ; Given that the checksum is a 2-byte value, and that there are exactly 2 bytes
@@ -965,7 +969,7 @@ F297: 08 38    .byte $08,$38
 ;
 
 F299: CE 0F 97 ldx  #$0F97                   ; Read [$f97]
-F29C: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F29C: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F29F: C1 4A    cmpb #$4A                     ; Is $4a?
 F2A1: 26 03    bne  $F2A6                    ; If not, return
 F2A3: 7E F0 00 jmp  $F000                    ; Cold boot
@@ -1011,7 +1015,7 @@ F2A6: 39       rts
 ;
 
 F2A7: CE 0C 6F ldx  #$0C6F                   ; We'll be reading [$c6f]
-F2AA: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F2AA: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F2AD: C1 01    cmpb #$01                     ; If $01..
 F2AF: 27 23    beq  $F2D4                    ;       ..jump to $f2d4
 F2B1: C1 02    cmpb #$02                     ; If $02..
@@ -1025,7 +1029,7 @@ F2BB: 27 72    beq  $F32F                    ;       ..jump to $f32f
 ; If [$f95] != $42 (66), skip to return
 ;
 F2BD: CE 0F 95 ldx  #$0F95
-F2C0: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F2C0: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F2C3: C1 42    cmpb #$42
 F2C5: 26 0C    bne  $F2D3                    ; rts
 
@@ -1037,7 +1041,7 @@ F2C5: 26 0C    bne  $F2D3                    ; rts
 ; have been instructive.
 ;
 F2C7: CE 0C 24 ldx  #$0C24
-F2CA: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F2CA: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F2CD: F1 00 52 cmpb $0052
 F2D0: 27 01    beq  $F2D3
 F2D2: 36       psha 
@@ -1049,7 +1053,7 @@ F2D3: 39       rts
 ; $0052 and [$c24], then marks as done by setting [$c6f] to $00.
 ;
 F2D4: CE 00 01 ldx  #$0001                   ; Fetch some DIPs
-F2D7: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F2D7: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F2DA: 54       lsrb                          ; Move the pricing DIPs..
 F2DB: 54       lsrb 
 F2DC: 54       lsrb 
@@ -1058,13 +1062,13 @@ F2DE: C4 03    andb #$03                     ; Zero out the others
 F2E0: CE F3 43 ldx  #$F343                   ; Point X to a table base
 F2E3: 3A       abx                           ; Add the DIPs value as an offset
 F2E4: A6 00    lda  $00,x                    ; Look up table value into A
-F2E6: 16       tab                           ; Copy to B for the WRITE_RAM
+F2E6: 16       tab                           ; Copy to B for the P_CPU_BUS_WRITE
 F2E7: F7 00 52 stb  $0052                    ; Cache the value in $0052
 F2EA: CE 0C 24 ldx  #$0C24                   ; Store it in [$c24]
-F2ED: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F2ED: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F2F0: CE 0C 6F ldx  #$0C6F                   ; Mark as done
 F2F3: C6 00    ldb  #$00
-F2F5: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F2F5: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F2F8: 39       rts  
 
 ; Reached when [$c6f] == $02
@@ -1074,16 +1078,16 @@ F2F8: 39       rts
 ; $00.
 ;
 F2F9: CE 0C 24 ldx  #$0C24
-F2FC: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F2FC: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F2FF: C1 0A    cmpb #$0A
 F301: 27 0A    beq  $F30D
 F303: 5C       incb 
 F304: F7 00 52 stb  $0052
 F307: CE 0C 24 ldx  #$0C24
-F30A: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F30A: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F30D: CE 0C 6F ldx  #$0C6F
 F310: C6 00    ldb  #$00
-F312: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F312: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F315: 39       rts  
 
 ; Reached when [$c6f] == $04
@@ -1092,14 +1096,14 @@ F315: 39       rts
 ; in $0052, then marks as done by setting [$c6f] to $00.
 ;
 F316: CE 0C 24 ldx  #$0C24
-F319: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F319: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F31C: 5A       decb 
 F31D: F7 00 52 stb  $0052
 F320: CE 0C 24 ldx  #$0C24
-F323: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F323: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F326: CE 0C 6F ldx  #$0C6F
 F329: C6 00    ldb  #$00
-F32B: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F32B: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F32E: 39       rts  
 
 ; Reached when [$c6f] == $08
@@ -1110,10 +1114,10 @@ F32E: 39       rts
 F32F: C6 0A    ldb  #$0A
 F331: F7 00 52 stb  $0052
 F334: CE 0C 24 ldx  #$0C24
-F337: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F337: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F33A: CE 0C 6F ldx  #$0C6F
 F33D: C6 00    ldb  #$00
-F33F: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F33F: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F342: 39       rts  
 
 ;
@@ -1242,7 +1246,7 @@ F3E2: 39       rts                           ; (See routine at $f2a7)
 ;
 
 F3E3: CE 0C 7E ldx  #$0C7E
-F3E6: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F3E6: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F3E9: C1 01    cmpb #$01                     ; If $01..
 F3EB: 27 2F    beq  $F41C                    ;       ..go to $f41c
 F3ED: C1 02    cmpb #$02                     ; If $02..
@@ -1264,11 +1268,11 @@ F403: 27 7E    beq  $F483                    ;       ..go to $f483
 ; otherwise, read [$c26]. If it doesn't match $0054, trash the stack (why?!)
 ;
 F405: CE 0F 95 ldx  #$0F95
-F408: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F408: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F40B: C1 42    cmpb #$42
 F40D: 26 0C    bne  $F41B
 F40F: CE 0C 26 ldx  #$0C26
-F412: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F412: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F415: F1 00 54 cmpb $0054
 F418: 27 01    beq  $F41B 
 F41A: 36       psha                          ; Puts a stray byte on the stack before an rts. Will crash.
@@ -1277,29 +1281,29 @@ F41B: 39       rts
 ; [$c7e] was $01: clear what's at [$c26], $0054 and [$c7e]
 F41C: CE 0C 26 ldx  #$0C26
 F41F: C6 00    ldb  #$00
-F421: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F421: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F424: 7F 00 54 clr  $0054
 F427: CE 0C 7E ldx  #$0C7E
 F42A: C6 00    ldb  #$00
-F42C: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F42C: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F42F: 39       rts  
 
 ; [$c7e] was $02: increment what's at [$c26], caching new value at $0054; clear [$c7e]
 F430: CE 0C 26 ldx  #$0C26
-F433: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F433: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F436: 5C       incb 
 F437: F7 00 54 stb  $0054
 F43A: CE 0C 26 ldx  #$0C26
-F43D: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F43D: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F440: CE 0C 7E ldx  #$0C7E
 F443: C6 00    ldb  #$00
-F445: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F445: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F448: 39       rts  
 
 ; [$c7e] was $04: write $31 to [$c26] and $0054, and $00 to [$c7e]
 F449: CE 0C 26 ldx  #$0C26
 F44C: C6 31    ldb  #$31
-F44E: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F44E: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F451: C6 31    ldb  #$31
 ; Falls through...
 
@@ -1307,34 +1311,34 @@ F451: C6 31    ldb  #$31
 F453: F7 00 54 stb  $0054                    ; Cache the value we just wrote to shared RAM
 F456: CE 0C 7E ldx  #$0C7E                   ; To [$c7e], write..
 F459: C6 00    ldb  #$00                     ; ..zero
-F45B: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F45B: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F45E: 39       rts                           ; Done
 
 ; [$c7e] was $08: write $62 to [$c26] and $0054, and $00 to [$c7e]
 F45F: CE 0C 26 ldx  #$0C26
 F462: C6 62    ldb  #$62
-F464: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F464: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F467: C6 62    ldb  #$62
 F469: 20 E8    bra  $F453                    ; Common ending
 
 ; [$c7e] was $10: write $63 to [$c26] and $0054, and $00 to [$c7e]
 F46B: CE 0C 26 ldx  #$0C26
 F46E: C6 63    ldb  #$63
-F470: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F470: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F473: C6 63    ldb  #$63
 F475: 20 DC    bra  $F453                    ; Common ending
 
 ; [$c7e] was $20: write $64 to [$c26] and $0054, and $00 to [$c7e]
 F477: CE 0C 26 ldx  #$0C26
 F47A: C6 64    ldb  #$64
-F47C: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F47C: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F47F: C6 64    ldb  #$64
 F481: 20 D0    bra  $F453                    ; Common ending
 
 ; [$c7e] was $40: write $65 to [$c26] and $0054, and $00 to [$c7e]
 F483: CE 0C 26 ldx  #$0C26
 F486: C6 65    ldb  #$65
-F488: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F488: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F48B: C6 65    ldb  #$65
 F48D: 20 C4    bra  $F453                    ; Common ending
 
@@ -1348,7 +1352,7 @@ F48D: 20 C4    bra  $F453                    ; Common ending
 ;
 
 F48F: CE 0C 5F ldx  #$0C5F                   ; [$c5f] = player 1 liveness
-F492: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F492: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 
 ; Check phony liveness value of player 1 before starting (see note in memory map)
 F495: C4 01    andb #$01
@@ -1358,10 +1362,10 @@ F49B: 39       rts
 
 F49C: 7F 00 57 clr  $0057                    ; Reset count of beasties processed
 F49F: CE 0C 60 ldx  #$0C60                   ; Point X to the player's Y position
-F4A2: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F4A2: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F4A5: F7 00 55 stb  $0055                    ; Store Y position in $0055
 F4A8: CE 0C 61 ldx  #$0C61                   ; Point X to the player's X position
-F4AB: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F4AB: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F4AE: F7 00 56 stb  $0056                    ; Store X position in $0056
 F4B1: CC 0C 01 ldd  #$0C01                   ; Store pointer to first beastie input structure..
 F4B4: FD 00 58 std  $0058                    ; ..in $0058
@@ -1371,7 +1375,7 @@ F4BD: 7F 00 5C clr  $005C                    ; Reset count of Y overlaps
 
 ; Loop start for beastie iteration
 F4C0: FE 00 58 ldx  $0058                    ; Load current beastie's life stage
-F4C3: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F4C3: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F4C6: C4 01    andb #$01                     ; Is bit 1 set? (ie. is it alive?)
 F4C8: C1 01    cmpb #$01
 F4CA: 27 03    beq  $F4CF                    ; If so, let's process it
@@ -1385,7 +1389,7 @@ F4D2: 08       inx                           ; Increment, so X now points to its
 ; the output structure we'll write a qualitative who's-above-whom code, and into
 ; the fifth we'll write the quantitative difference.
 ;
-F4D3: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS, fetching the Y coordinate into B
+F4D3: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ, fetching Y pos into B
 F4D6: B6 00 55 lda  $0055                    ; Load player Y pos into A
 F4D9: 10       sba                           ; Subtract beastie Y from player Y, into A
 F4DA: 27 0B    beq  $F4E7                    ; If they match, branch to $f4e7
@@ -1406,7 +1410,7 @@ F4E7: C6 80    ldb  #$80                     ; Output code will be $80
 ; Write output code to byte 0 of beastie output structure
 F4E9: FE 00 5A ldx  $005A                    ; Point X to beastie output structure base
 F4EC: 36       psha                          ; Stash absolute Y delta on the stack
-F4ED: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F4ED: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 
 ; Store the absolute Y delta into the fifth byte of the output structure
 F4F0: FE 00 5A ldx  $005A
@@ -1417,7 +1421,7 @@ F4F6: 08       inx
 F4F7: 32       pula 
 F4F8: 36       psha 
 F4F9: 16       tab  
-F4FA: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F4FA: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 
 F4FD: 32       pula                          ; Retrieve stashed absolute Y delta
 F4FE: 81 08    cmpa #$08
@@ -1433,7 +1437,7 @@ F502: 7C 00 5C inc  $005C                    ; Bump the Y overlap count
 F505: FE 00 58 ldx  $0058                    ; Point X to beastie input structure..
 F508: 08       inx                           ; ..
 F509: 08       inx                           ; ..+2, which is their X coordinate
-F50A: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS, putting the X pos in B
+F50A: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ, fetching X pos into B
 F50D: B6 00 56 lda  $0056                    ; Retrieve the player's X pos into A
 F510: 10       sba                           ; Subtract beastie X from player X, into A
 F511: 27 0B    beq  $F51E                    ; If they match, branch to $f51e
@@ -1456,7 +1460,7 @@ F520: FE 00 5A ldx  $005A                    ; Point X to beastie output structu
 F523: 08       inx                           ; ..and add..
 F524: 08       inx                           ; ..two
 F525: 36       psha                          ; Stash absolute X delta on the stack
-F526: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F526: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 
 ; Store the absolute X delta into the seventh byte of the output structure
 F529: FE 00 5A ldx  $005A
@@ -1469,7 +1473,7 @@ F531: 08       inx
 F532: 32       pula 
 F533: 36       psha 
 F534: 16       tab  
-F535: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F535: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 
 F538: 32       pula                          ; Retrieve stashed absolute X delta
 F539: 81 08    cmpa #$08
@@ -1544,7 +1548,7 @@ F566: 27 FA    beq  $F562                    ; If not, early-out
 ; try kill off a player when they're already dead (would there be any harm?)
 ;
 F568: CE 0C 5F ldx  #$0C5F                   ; Re-load player phony liveness
-F56B: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F56B: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F56E: C4 01    andb #$01                     ; Echoing what happened at $f4c6..
 F570: C1 01    cmpb #$01                     ; ..
 F572: 26 EE    bne  $F562                    ; Early-out if player seems dead (never happens)
@@ -1553,10 +1557,10 @@ F572: 26 EE    bne  $F562                    ; Early-out if player seems dead (n
 ; 
 F574: CE 0C 62 ldx  #$0C62                   ; Store in [$c62]..
 F577: C6 01    ldb  #$01                     ; ..a flag to presumably request death
-F579: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F579: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F57C: F6 00 57 ldb  $0057                    ; Load beastie loop counter into B..
 F57F: CE 0C 63 ldx  #$0C63                   ; ..to report which beastie cause the collision
-F582: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
+F582: 7E F1 DB jmp  $F1DB                    ; Call P_CPU_BUS_WRITE and return
 
 
 ;
@@ -1772,7 +1776,7 @@ F6C8: 7E F1 DB jmp  $F1DB                    ; (See routine at $f6cb)
 ;
 
 F6CB: CE 0C 76 ldx  #$0C76                   ; Fetch table source from [$c76]
-F6CE: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F6CE: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F6D1: CE F7 17 ldx  #$F717                   ; Point X to CREEPER_TABLES
 F6D4: 3A       abx                           ; Table entries are 16-bit..
 F6D5: 3A       abx                           ; ..so add the index twice
@@ -1790,7 +1794,7 @@ F6E5: 20 E4    bra  $F6CB                    ; ..and re-run from the start
 F6E7: 7C 00 5F inc  $005F                    ; Increment sequence index
 F6EA: 16       tab                           ; Transfer sequence value to B..
 F6EB: CE 0C 77 ldx  #$0C77                   ; ..to output at [$c77]
-F6EE: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
+F6EE: 7E F1 DB jmp  $F1DB                    ; Call P_CPU_BUS_WRITE and return
 
 
 ;
@@ -2324,16 +2328,16 @@ F898: FF       .byte $FF
 ;
 
 F899: CE 0C 7A ldx  #$0C7A                   ; [$c7a] = is clock active?
-F89C: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F89C: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F89F: 5D       tstb                          ; Is it nonzero?
 F8A0: 26 01    bne $F8A3                     ; If so, handle
 F8A2: 39       rts                           ; If not, we're done
 
 F8A3: CE 0C 79 ldx  #$0C79                   ; Clock countdown high byte -> B
-F8A6: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F8A6: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F8A9: 37       pshb                          ; Stash high byte
 F8AA: CE 0C 78 ldx  #$0C78                   ; Clock countdown low byte -> B
-F8AD: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F8AD: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F8B0: 32       pula                          ; Stashed high byte -> A, so D now has 16-bit count
 F8B1: 83 00 01 subd #$0001                   ; Decrement the count
 F8B4: 26 11    bne  $F8C7                    ; Skip the below if nonzero
@@ -2341,18 +2345,18 @@ F8B4: 26 11    bne  $F8C7                    ; Skip the below if nonzero
 ; Report that clock's finished
 F8B6: CE 0C 7A ldx  #$0C7A                   ; Point X to clock-is-active flag
 F8B9: C6 00    ldb  #$00                     ; Flag will be cleared
-F8BB: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F8BB: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F8BE: CE 0C 7B ldx  #$0C7B                   ; Into [$c7b], we'll be writing..
 F8C1: C6 01    ldb  #$01                     ; ..$01 to say the clock's done
-F8C3: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F8C3: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F8C6: 39       rts  
 
 F8C7: 36       psha                          ; Stash high byte
 F8C8: CE 0C 78 ldx  #$0C78                   ; Write low byte
-F8CB: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F8CB: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F8CE: 33       pulb                          ; Retrieve high byte
 F8CF: CE 0C 79 ldx  #$0C79                   ; Write low byte
-F8D2: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
+F8D2: 7E F1 DB jmp  $F1DB                    ; Call P_CPU_BUS_WRITE and return
 
 
 ;
@@ -2370,7 +2374,7 @@ F8D2: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
 ;
 
 F8D5: CE 0C 71 ldx  #$0C71                   ; Read [$c71]
-F8D8: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F8D8: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F8DB: C1 0D    cmpb #$0D                     ; If $0d..
 F8DD: 27 01    beq  $F8E0                    ;       ..skip the return
 F8DF: 39       rts                           ; Early-out
@@ -2382,7 +2386,7 @@ F8E7: 39       rts                           ; Early-out
 
 F8E8: CE 0C 1E ldx  #$0C1E                   ; Into the phony credits count..
 F8EB: C6 2A    ldb  #$2A                     ; ..write $2a (42)
-F8ED: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F8ED: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F8F0: 39       rts  
 
 
@@ -2396,13 +2400,13 @@ F8F0: 39       rts
 ; now.
 ;
 F8F1: CE 0C 7C ldx  #$0C7C
-F8F4: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F8F4: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F8F7: 5C       incb 
 F8F8: C1 06    cmpb #$06
 F8FA: 26 01    bne  $F8FD
 F8FC: 5F       clrb 
 F8FD: CE 0C 7C ldx  #$0C7C
-F900: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
+F900: 7E F1 DB jmp  $F1DB                    ; Call P_CPU_BUS_WRITE and return
 
 
 ;
@@ -2443,7 +2447,7 @@ F900: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
 ; Return immediately if value of [status] ([$f88] in this case) isn't $01
 ;
 F903: CE 0F 88 ldx  #$0F88                   ; Put status ptr in X
-F906: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F906: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F909: C1 01    cmpb #$01                     ; Is it $01?
 F90B: 27 01    beq  $F90E                    ; If so, proceed
 F90D: 39       rts                           ; Otherwise, we're done
@@ -2451,7 +2455,7 @@ F90D: 39       rts                           ; Otherwise, we're done
 ; Fetch the table number from [table ptr] ([$f8a] in this case)
 ;
 F90E: CE 0F 8A ldx  #$0F8A                   ; Put table ptr in X
-F911: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F911: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F914: CE F9 B1 ldx  #$F9B1                   ; Use TRANSLATOR_TABLES as base pointer
 F917: 3A       abx                           ; Add B to it..
 F918: 3A       abx                           ; ..twice, since table entries are 16-bit
@@ -2461,7 +2465,7 @@ F91B: 3C       pshx                          ; Stash table pointer
 ; Fetch the index within that table from [index ptr] ([$f89] in this case)
 ;
 F91C: CE 0F 89 ldx  #$0F89                   ; Put index ptr in X
-F91F: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F91F: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F922: 38       pulx                          ; Retrieve stashed table pointer
 F923: 3A       abx                           ; Add index to table base
 F924: E6 00    ldb  $00,x                    ; Read table entry into B
@@ -2470,7 +2474,7 @@ F926: 37       pshb                          ; Then stash it
 ; Fetch the output offset from [output offset ptr] ([$f8b] in this case)
 ;
 F927: CE 0F 8B ldx  #$0F8B                   ; Put output offset ptr in X
-F92A: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
+F92A: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 
 ; Store the looked-up table value in [output base + fetched output offset]
 ; ([$c88 + fetched output offset] in this case)
@@ -2478,14 +2482,14 @@ F92A: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
 F92D: CE 0C 88 ldx  #$0C88                   ; Put output base in X
 F930: 3A       abx                           ; Add the offset
 F931: 33       pulb                          ; Retrieved stashed value
-F932: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
+F932: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 
 ; Write $ff to [status] ([$f88] in this case), presumably signaling to the main
 ; CPU that the processing is done, and preventing this re-running next time
 ;
 F935: C6 FF    ldb  #$FF                     ; '$ff' means fulfilled
 F937: CE 0F 88 ldx  #$0F88                   ; Use status ptr for store
-F93A: 7E F1 DB jmp  $F1DB                    ; Call WRITE_RAM and return
+F93A: 7E F1 DB jmp  $F1DB                    ; Call P_CPU_BUS_WRITE and return
 
 
 ;
