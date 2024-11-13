@@ -329,8 +329,8 @@
 ; $004f:         Cached controls/DIPs byte 1 (but never retrieved)
 ; $0050:         Cached controls/DIPs byte 2 (but never retrieved)
 ; $0051:         Cached controls/DIPs byte 3 (but never retrieved)
-; $0052:         Unknown, see $f2e7 et al
-; $0053:         Parallel of $0052
+; $0052:         Seems unused (cached result from PROCESS_C6F)
+; $0053:         Seems unused (cached result from PROCESS_C70)
 ; $0054:         Unknown (credits related?)
 ; $0055:         Cached player Y position
 ; $0056:         Cached player X position
@@ -974,12 +974,38 @@ F2A6: 39       rts
 ; PROCESS_C6F:
 ; (Called from IRQ_HANDLER)
 ;
-; Does work depending on value of [$c6f], which in a playthrough of the game was
-; never written to by the main CPU outside of the RAM self-test.
+; Looks like this manages access to a phony credits count at [$c24].
+; Not the one at [$c1e] that PROCESS_PHONY_CREDITS manages! A different one,
+; equally ignored by the game itself.
 ;
-; When active, also reads and writes [$c24], and $0052
+; Uses [$c6f] as a request channel, which in a playthrough of the game was
+; never written to by the main CPU outside of the RAM self-test. Its actions
+; are:
 ;
-; Mirrored in PROCESS_C70, with different constants
+;   [$c6f] == $01: sets [$c24] to 0, 1, 2 or 4 depending on COIN A pricing DIPs
+;   [$c6f] == $02: increments [$c24], clamping at 10
+;   [$c6f] == $04: decements [$c24]
+;   [$c6f] == $08: sets [$c24] to 10
+;
+; After completing the request, it resets [$c6f] to $00, and stashes whatever
+; value it just worked on in $0052.
+;
+; If this is the credit count, then there's a few head-scratchers. One is why
+; it would clamp to 10? The max they went with for the game as you know it is 9
+; (maybe the spec changed?). Another is why there'd be a handler for setting it
+; _to_ 10. Possibly an abandoned free play mode?
+;
+; Having decrementer functionality contrasts with PROCESS_PHONY_CREDITS. That
+; one seems to rely on the main CPU doing it, which is unsafe, but this
+; alternative has its own drawbacks: if the pricing was one-coin-two-credits,
+; then you'd either need two of these (which we do have! See PROCESS_C70) to
+; process both requests in the same, or for the CPU to queue requests. And given
+; that both coin slots could trigger in the same frame, meaning four credits
+; coming in at once (for one-coin-two-credits pricing, though would two-coins-
+; three-credits track the two slots independently? If so, six at once!), you'd
+; absolutely need queueing.
+;
+; Maybe Taito had overlooked that, leading to this being mothballed?
 ;
 
 F2A7: CE 0C 6F ldx  #$0C6F                   ; We'll be reading [$c6f]
@@ -1001,10 +1027,12 @@ F2C0: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
 F2C3: C1 42    cmpb #$42
 F2C5: 26 0C    bne  $F2D3                    ; rts
 
-; [$f95] was $42. Read [$c24]. If it doesn't match contents of addr $52, push the
-; accumulator onto the stack and then try rts. Which would be sure to fail
-; because the top of the stack just had the accumulator pushed to it. So this
-; is pretty puzzling.
+; [$f95] was $42. Read [$c24]. If it doesn't match the contents of $0052 (which
+; was trying to cache what [$c24] was being set to) push the A register onto
+; the stack and then try rts -- which would crash because the top of the stack
+; just had that register value pushed to it. I'm guessing that was intentional,
+; so a debugger could kick in, though the value pushed on the stack wouldn't
+; have been instructive.
 ;
 F2C7: CE 0C 24 ldx  #$0C24
 F2CA: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
@@ -1015,26 +1043,33 @@ F2D3: 39       rts
 
 ; Reached when [$c6f] == $01
 ;
-F2D4: CE 00 01 ldx  #$0001
+; Reads the COIN A pricing DIPs, uses them as a table index, copies result to
+; $0052 and [$c24], then marks as done by setting [$c6f] to $00.
+;
+F2D4: CE 00 01 ldx  #$0001                   ; Fetch some DIPs
 F2D7: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
-F2DA: 54       lsrb 
+F2DA: 54       lsrb                          ; Move the pricing DIPs..
 F2DB: 54       lsrb 
 F2DC: 54       lsrb 
-F2DD: 54       lsrb 
-F2DE: C4 03    andb #$03
-F2E0: CE F3 43 ldx  #$F343                   ; A small table
-F2E3: 3A       abx  
-F2E4: A6 00    lda  $00,x
-F2E6: 16       tab  
-F2E7: F7 00 52 stb  $0052
-F2EA: CE 0C 24 ldx  #$0C24
+F2DD: 54       lsrb                          ; ..into bits 1 and 0
+F2DE: C4 03    andb #$03                     ; Zero out the others
+F2E0: CE F3 43 ldx  #$F343                   ; Point X to a table base
+F2E3: 3A       abx                           ; Add the DIPs value as an offset
+F2E4: A6 00    lda  $00,x                    ; Look up table value into A
+F2E6: 16       tab                           ; Copy to B for the WRITE_RAM
+F2E7: F7 00 52 stb  $0052                    ; Cache the value in $0052
+F2EA: CE 0C 24 ldx  #$0C24                   ; Store it in [$c24]
 F2ED: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
-F2F0: CE 0C 6F ldx  #$0C6F
+F2F0: CE 0C 6F ldx  #$0C6F                   ; Mark as done
 F2F3: C6 00    ldb  #$00
 F2F5: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 F2F8: 39       rts  
 
 ; Reached when [$c6f] == $02
+;
+; Increments the value of [$c24], clamping to 10. Copies the incremented value
+; to $0052, but only if it wasn't already 10. Marks as done by setting [$c6f] to
+; $00.
 ;
 F2F9: CE 0C 24 ldx  #$0C24
 F2FC: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
@@ -1051,6 +1086,9 @@ F315: 39       rts
 
 ; Reached when [$c6f] == $04
 ;
+; Decrements the value of [$c24], with no clamp. Stores the decremented value
+; in $0052, then marks as done by setting [$c6f] to $00.
+;
 F316: CE 0C 24 ldx  #$0C24
 F319: BD F1 BF jsr  $F1BF                    ; Call READ_RAM_OR_INPUTS
 F31C: 5A       decb 
@@ -1064,6 +1102,9 @@ F32E: 39       rts
 
 ; Reached when [$c6f] == $08
 ;
+; Sets [$c24] to 10, copying it to $0052, then marks as done by setting [$c6f]
+; to $00.
+;
 F32F: C6 0A    ldb  #$0A
 F331: F7 00 52 stb  $0052
 F334: CE 0C 24 ldx  #$0C24
@@ -1073,8 +1114,12 @@ F33D: C6 00    ldb  #$00
 F33F: BD F1 DB jsr  $F1DB                    ; Call WRITE_RAM
 F342: 39       rts  
 
-; A small table, called from $f380 and $f2e0
 ;
+; A small table, used by PROCESS_C6F and PROCESS_C70 to translate DIP switch
+; combos for pricing into bit fields (which they'd almost certainly not need to
+; be)
+;
+
 F343: 01       .byte $01
 F344: 00       .byte $00
 F345: 04       .byte $04
@@ -1089,6 +1134,11 @@ F346: 02       .byte $02
 ;   - [$c70] instead of [$c6f]
 ;   - [$c25] instead of [$c24]
 ;   - $0053  instead of $0052
+;
+; Interestingly, it's such a copy/paste of PROCESS_C6F that it also uses the
+; COIN A price DIPs, rather than shifting extra places, like
+; PROCESS_PHONY_CREDITS does, to get COIN B prices. Meaning nothing in this
+; (abandoned) set of routines would look at COIN B prices.
 ;
 ; The CPU wasn't seen activating this one during a playthrough either.
 ;
