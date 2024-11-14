@@ -5,16 +5,16 @@
 ;     https://github.com/luxocrates/bubbleBobblePs4Disasm
 ;
 ; The PS4 (labeled JPH1011P, but referred to throughout official sources as PS4)
-; is a 6801U4 microcontroller which serves as a security device for Bubble Bobble,
-; without which the game is unplayable.
+; is a 6801U4 microcontroller which serves as a security device for the 1986
+; Taito arcade game Bubble Bobble, without which the game is unplayable.
 ;
-; This document is a disassembly of its mask ROM, with an attempt at interpreting
-; its routines. The binary file it's based on was named `a78-01.17`, with md5sum
-; `7408cf481379cc8ce08177a17e83071e`.
+; This document is a disassembly of its mask ROM, annotated with an
+; interpretation of its routines. The binary file it's based on was
+; 'a78-01.17', md5sum 7408cf481379cc8ce08177a17e83071e.
 ;
 ; TL;DR: PS4 roles include:
-;   - interfacing with player controls, DIP switches, the coin mechanisms and
-;     cabinet switches, and relaying their values to the main CPU
+;   - interfacing with player controls, DIP switches, coin mechanisms and the
+;     cabinet's 'service' switch
 ;   - informing the beasties of where the players are
 ;   - rotating which EXTEND bubbles the players are given
 ;   - effecting functionality for the clock special item
@@ -23,21 +23,18 @@
 ; Suffice it to say, one does not _need_ a microcontroller to do any of the
 ; above. The PS4's real purpose is to move some vital functionality behind an
 ; opaque curtain. However, it seems obvious from the code that Taito had
-; intended for more functionality to be on the PS4 than just the above.
-; Specifically, we see routines and data hookups for:
+; intended for more functionality to be hosted on the PS4 than just the above.
+; Specifically, we see routines and data hookups for the PS4 to...
 ;
-;   - performing collision detection between players and level beasties
-;     (not Skel Monsta/Baron von Blubba)
-;   - controlling the speed of the wind simulation
-;   - owning the credits count
+;   - perform collision detection between players and level beasties
+;   - control the speed of the wind simulation
+;   - own the credits count
+;   - own the level count
 ;
-; ...where the calculations are performed on the PS4, but their results ignored
-; by the main CPU. In the case of the beastie collision detection, there's a
-; clear showstopper bug preventing its use. For the others, less so. There are
-; additional functions whose mechanics seem arbitrary enough to be unguessable,
-; and which don't seem to get triggered by in-game actions, so we may never
-; know what the intention was.
-; 
+; For these, the calculations are performed on the PS4, but their results are
+; ignored by the main CPU. In the case of the beastie collision detection,
+; there are clear showstopper bugs preventing its use. Some others look like
+; they have flaws, if not major ones.
 ;
 ;
 ; The 6801U4 is a microcontroller variant of the 6800 microprocessor, with 4KiB
@@ -50,6 +47,9 @@
 ;   `ora $47` and think it's ORing with a constant, when in fact the argument is
 ;   being read from memory.
 ; - The 6801U4 has extra opcodes that you won't find on the regular 6800.
+;
+; For more information on the 6801U4, see Motorola's manual:
+;     DL139, "Microprocessor, Microcontroller, and Peripheral Data", Volume 1
 ;
 ;
 ; I/O port map
@@ -78,18 +78,23 @@
 ;
 ;   P-CPU addr      Main CPU addr   Device
 ;   -----------------------------------------------------
-;   [$000]-[$003]   (unmapped*)     Inputs (DIPs, player controls)
+;   [$000]-[$003]   (unmapped)      Inputs (DIPs, player controls)
 ;   [$c00]-[$fff]   $fc00 - $ffff   Shared RAM $000-$3ff (IC16, a 2016-100)
-;
-;   (* TODO - check this)
 ;
 ; For the memory layout below:
 ;
-;   - 'r'/'w'/'rw' are from the perspective of the PS4.
+;   - 'r'/'w'/'rw' are from the perspective of the PS4 and represent how the
+;     code tries to access the addresses, even if that'll never happen in the
+;     actual game.
 ;   - 'Seems unused' means that although the address is used by a routine,
-;     the game didn't seem to be making use of it.
-;   - You'll see a lot of occasions where they use bitfields for things that
+;     the game doesn't seem to be making use of it. Likely the functionality was
+;     abandoned.
+;   - You'll see a lot of occasions where bitfields are used for things that
 ;     don't need them (states which are guaranteed to be mutually exclusive).
+;     Don't assume, where you see power-of-two values, that multiple bits can
+;     be set at once.
+;   - The addresses aren't in strict order: some have been nudged to group them
+;     with related valules.
 ;
 ; -- Input ports ---------------------------------------------------------------
 ;
@@ -120,17 +125,15 @@
 ;
 ; ------------------------------------------------------------------------------
 ;
-; [$c1e](rw) - Phony credits count
+; [$c1e](rw) - Phony credits count (seems unused)
 ;
 ; It seems likely that this value was intended to be the authoritative credits
-; count, but got deprecated, with vestiges of it remaining.
+; count, but was abandoned.
 ;
-; The main CPU tracks the credits count itself, using only the relay of port 1
-; at [$c1f] to increment it. After incrementing, however, it does update the
-; the shared value at [$c1e], but it's not clear why: this seems to be the
-; only time the CPU updates the value -- it doesn't decrement it on game start.
-; Separately, the main CPU communicates to the PS4 using [$f94] whether the
-; coin lockouts should be enabled or not.
+; The main CPU tracks the credits count itself (not in shared RAM), but after
+; incrementing it following a coin insertion, it does update this value. It's
+; not clear why, and that seems to be the only time the CPU updates the value:
+; it doesn't decrement it on game start.
 ;
 ; -- Relayed input ports -------------------------------------------------------
 ;
@@ -140,11 +143,11 @@
 ; [$c22](w)  - Relay of [$002]
 ; [$c23](w)  - Relay of [$003]
 ;
-; ------------------------------------------------------------------------------
+; -- Controller outputs --------------------------------------------------------
 ;
-; [$c24](rw) - Seems unused (see PROCESS_C6F)
-; [$c25](rw) - Seems unused (see PROCESS_C70)
-; [$c26](rw) - Seems unused (see PROCESS_C7E)
+; [$c24](rw) - Phony credits count 1 (seems unused)
+; [$c25](rw) - Phony credits count 2 (seems unused)
+; [$c26](rw) - Phony level (seems unused)
 ;
 ; -- Beastie output structure --------------------------------------------------
 ;
@@ -179,32 +182,32 @@
 ;              unless it is $01, but nothing ever seems to reset it to zero.
 ; [$c60](r)  - Player 1 Y position
 ; [$c61](r)  - Player 1 X position
-; [$c62](w)  - Player 1 phony kill switch
+; [$c62](w)  - Player 1 kill switch (seems unused)
 ;              Most likely intended as a way for the PS4 to tell the CPU to kill
 ;              off player 1, but collision detection code was botched, so the
-;              CPU seems to disregard this value. Likely, this is why [$c5f]
-;              isn't really used.
+;              CPU disregards this value. Likely, this is why [$c5f] isn't
+;              really used.
 ; [$c63](w) -  Index of beastie that the bugged collision detector thinks
 ;              collided with the player
 ;
 ; [$c67]-[$c6b] - Player 2 equivalents of [$c5f]-[$c63]
 ;
-; ------------------------------------------------------------------------------
+; -- Controller inputs ---------------------------------------------------------
 ;
-; [$c6f](rw) - Seems unused (see PROCESS_C6F)
-; [$c70](rw) - Seems unused (see PROCESS_C70)
-; [$c71](r)  - Seems unused (see PROCESS_CREDITS_MISCHIEF)
+; [$c6f](rw) - Command for phony credits controller 1 (seems unused)
+; [$c70](rw) - Command for phony credits controller 2 (seems unused)
+; [$c7e](r)  - Command for phony level controller (seems unused)
 ;
 ; -- Creepers (see PROCESS_CREEPER_C76) ----------------------------------------
 ;
-; [$c72](r)  - Seems unused (feeds creeper for [$c73])
-; [$c73](w)  - Seems unused (fed from creeper for [$c72])
-; [$c74](r)  - Seems unused (feeds creeper for [$c75])
-; [$c75](w)  - Seems unused (fed from creeper for [$c74])
-; [$c76](r)  - Wind speed   (feeds creeper for [$c77])
-; [$c77](w)  - Seems unused (fed from creeper for [$c76])
-; [$c80](r)  - Seems unused (feeds creeper for [$c81])
-; [$c81](w)  - Seems unused (fed from creeper for [$c80])
+; [$c72](r)  - Seems unused (input to creeper for [$c73])
+; [$c73](w)  - Seems unused (output from creeper for [$c72])
+; [$c74](r)  - Seems unused (input to creeper for [$c75])
+; [$c75](w)  - Seems unused (output from creeper for [$c74])
+; [$c76](r)  - Wind speed   (input to creeper for [$c77])
+; [$c77](w)  - Seems unused (output from creeper for [$c76])
+; [$c80](r)  - Seems unused (input to creeper for [$c81])
+; [$c81](w)  - Seems unused (output from creeper for [$c80])
 ;
 ; -- Clock ---------------------------------------------------------------------
 ;
@@ -214,10 +217,10 @@
 ; [$c7b](w)  - Clock countdown complete, if PS4 writes $01
 ;
 ; ------------------------------------------------------------------------------
+; [$c71]     - enables PROCESS_CREDITS_MISCHIEF, if $0d (seems unused)
 ; [$c7c](rw) - Which EXTEND bubble the player would be offered if one appeared
 ;              right now
 ; [$c7d](w)  - I/O error reporting. PS4 writes $01 on error.
-; [$c7e](rw) - Seems unused (see PROCESS_C7E)
 ; [$c7f](r)  - Seems unused (input for dead code at $f216-$f235)
 
 ; [$c82](w)  - PS4 checksum high byte (game will report error if nonzero)
@@ -226,23 +229,23 @@
 ;
 ; -- Translators (see PROCESS_TRANSLATOR_F88) ----------------------------------
 ;
-; Theoretically, translators could target any other variables in the range
-; [$c88]-[$f87], but in practice are unused.
+; In theory, translators could target any other addresses in the range
+; [$c88]-[$f87], but in practice they're unused.
 ;
-; [$f88](rw) - status            for translator at $f903
-; [$f89](r)  - index ptr         for translator at $f903
-; [$f8a](r)  - table ptr         for translator at $f903
-; [$f8b](r)  - output offset ptr for translator at $f903
+; [$f88](rw) - status            for translator at $f903 (seems unused)
+; [$f89](r)  - index ptr         for translator at $f903 (seems unused)
+; [$f8a](r)  - table ptr         for translator at $f903 (seems unused)
+; [$f8b](r)  - output offset ptr for translator at $f903 (seems unused)
 ;
-; [$f8c](rw) - status            for translator at $f93d
-; [$f8d](r)  - index ptr         for translator at $f93d
-; [$f8e](r)  - table ptr         for translator at $f93d
-; [$f8f](r)  - output offset ptr for translator at $f93d
+; [$f8c](rw) - status            for translator at $f93d (seems unused)
+; [$f8d](r)  - index ptr         for translator at $f93d (seems unused)
+; [$f8e](r)  - table ptr         for translator at $f93d (seems unused)
+; [$f8f](r)  - output offset ptr for translator at $f93d (seems unused)
 ;
-; [$f90](rw) - status            for translator at $f977
-; [$f91](r)  - index ptr         for translator at $f977
-; [$f92](r)  - table ptr         for translator at $f977
-; [$f93](r)  - output offset ptr for translator at $f977
+; [$f90](rw) - status            for translator at $f977 (seems unused)
+; [$f91](r)  - index ptr         for translator at $f977 (seems unused)
+; [$f92](r)  - table ptr         for translator at $f977 (seems unused)
+; [$f93](r)  - output offset ptr for translator at $f977 (seems unused)
 ;
 ; ------------------------------------------------------------------------------
 ;
@@ -250,7 +253,9 @@
 ;                $01 - stop accepting
 ;                $ff - start accepting
 ;                otherwise, do not change
-; [$f95](r)  - Seems unused (see PROCESS_C6F, PROCESS_C70, PROCESS_C7E)
+; [$f95](r)  - Seems unused; possibly a debugging cache coherency check, if $42
+;              (see PROCESS_CREDITS_CONTROLLER_1, PROCESS_CREDITS_CONTROLLER_2,
+;              PROCESS_LEVEL_CONTROLLER)
 ; [$f96](r)  - Delay after interrupt handler, if $47
 ; [$f97](r)  - Reboot PS4, if $4a
 ; [$f98](r)  - Main CPU is ready, if $47
@@ -263,10 +268,8 @@
 ;
 ; 6801U4 Internal memory-mapped registers
 ; ---------------------------------------
-; For more information on the 6801U4, see Motorola's manual:
-; DL139, "Microprocessor, Microcontroller, and Peripheral Data", Volume 1
 ;
-; (From Table 4 on page 3-147)
+; (From manual, Table 4 on page 3-147)
 ;
 ; $0000: Port 1 data direction register
 ; $0001: Port 2 data direction register
@@ -329,9 +332,9 @@
 ; $004f:         Cached controls/DIPs byte 1 (but never retrieved)
 ; $0050:         Cached controls/DIPs byte 2 (but never retrieved)
 ; $0051:         Cached controls/DIPs byte 3 (but never retrieved)
-; $0052:         Seems unused (cached result from PROCESS_C6F)
-; $0053:         Seems unused (cached result from PROCESS_C70)
-; $0054:         Unknown (credits related?)
+; $0052:         Cached phony credits count 1
+; $0053:         Cached phony credits count 2
+; $0054:         Cached phony level
 ; $0055:         Cached player Y position
 ; $0056:         Cached player X position
 ; $0057:         Number of beastie currently being processed
@@ -432,11 +435,11 @@ F046: BD F1 F8 jsr  $F1F8                    ; Call INTERRUPT_MAIN_CPU
 F049: BD F2 36 jsr  $F236                    ; Call RELAY_PORTS
 F04C: BD F0 92 jsr  $F092                    ; Call PROCESS_PHONY_CREDITS
 F04F: BD F1 B0 jsr  $F1B0                    ; Call PROCESS_COIN_LOCKOUTS
-F052: BD F2 A7 jsr  $F2A7                    ; Call PROCESS_C6F
-F055: BD F3 47 jsr  $F347                    ; Call PROCESS_C70
-F058: BD F3 E3 jsr  $F3E3                    ; Call PROCESS_C7E
-F05B: BD F4 8F jsr  $F48F                    ; Call PROCESS_P1_BEASTIES
-F05E: BD F5 85 jsr  $F585                    ; Call PROCESS_P2_BEASTIES
+F052: BD F2 A7 jsr  $F2A7                    ; Call PROCESS_CREDITS_CONTROLLER_1
+F055: BD F3 47 jsr  $F347                    ; Call PROCESS_CREDITS_CONTROLLER_2
+F058: BD F3 E3 jsr  $F3E3                    ; Call PROCESS_LEVEL_CONTROLLER
+F05B: BD F4 8F jsr  $F48F                    ; Call PROCESS_BEASTIES_FOR_P1
+F05E: BD F5 85 jsr  $F585                    ; Call PROCESS_BEASTIES_FOR_P2
 F061: BD F6 7F jsr  $F67F                    ; Call PROCESS_CREEPER_C72_C74
 F064: BD F6 CB jsr  $F6CB                    ; Call PROCESS_CREEPER_C76
 F067: BD F6 F1 jsr  $F6F1                    ; Call PROCESS_CREEPER_C80
@@ -467,7 +470,8 @@ F091: 3B       rti                           ; Done: return to IDLE
 ; DIP switches, manages the coin lockouts to prevent excessive credits, and
 ; sends events to the main CPU when the count changes. The one thing it doesn't
 ; do is decrement the count when a game starts -- presumably they're expecting
-; the CPU to do that, though that'd entail a critical section issue.
+; the CPU to do that, but that introduces a critical section issue that could
+; cause an incoming coin to not register.
 ;
 ; Kicker: all of this code is completely inconsequential. The main CPU manages
 ; its own credits count, using only the coin information relayed by RELAY_PORTS.
@@ -977,41 +981,66 @@ F2A6: 39       rts
 
 
 ;
-; PROCESS_C6F:
+; PROCESS_CREDITS_CONTROLLER_1:
 ; (Called from IRQ_HANDLER)
 ;
-; Looks like this manages access to a phony credits count at [$c24].
-; Not the one at [$c1e] that PROCESS_PHONY_CREDITS manages! A different one,
-; equally ignored by the game itself.
+; This looks like it manages access to a credits count at [$c24], which the game
+; doesn't actually use.
 ;
-; Uses [$c6f] as a request channel, which in a playthrough of the game was
-; never written to by the main CPU outside of the RAM self-test. Its actions
-; are:
+; Not to be confused with the one at [$c1e] that PROCESS_PHONY_CREDITS manages.
+; That one's a whole system that bumps the credits count as coins come in,
+; translates their values using the DIP switches, and manages the lockouts.
+; This one's an alternative, simpler, and incompatible, solution, which acts as
+; an API for the main CPU to manipulate a credits count. Neither got used.
+;
+; Using [$c6f] as a request channel, the behavior of this routine is:
 ;
 ;   [$c6f] == $01: sets [$c24] to 0, 1, 2 or 4 depending on COIN A pricing DIPs
-;   [$c6f] == $02: increments [$c24], clamping at 10
-;   [$c6f] == $04: decements [$c24]
-;   [$c6f] == $08: sets [$c24] to 10
+;             $02: increments [$c24], clamping at 10
+;             $04: decrements [$c24]
+;             $08: sets [$c24] to 10
 ;
 ; After completing the request, it resets [$c6f] to $00, and stashes whatever
-; value it just worked on in $0052.
+; value it just worked on into $0052.
 ;
-; If this is the credit count, then there's a few head-scratchers. One is why
-; it would clamp to 10? The max they went with for the game as you know it is 9
-; (maybe the spec changed?). Another is why there'd be a handler for setting it
-; _to_ 10. Possibly an abandoned free play mode?
+; There's a few flaws with this solution:
 ;
-; Having decrementer functionality contrasts with PROCESS_PHONY_CREDITS. That
-; one seems to rely on the main CPU doing it, which is unsafe, but this
-; alternative has its own drawbacks: if the pricing was one-coin-two-credits,
-; then you'd either need two of these (which we do have! See PROCESS_C70) to
-; process both requests in the same, or for the CPU to queue requests. And given
-; that both coin slots could trigger in the same frame, meaning four credits
-; coming in at once (for one-coin-two-credits pricing, though would two-coins-
-; three-credits track the two slots independently? If so, six at once!), you'd
-; absolutely need queueing.
+; 1. Command $01 would be a way for the main CPU to learn the current pricing.
+;    The return value is placed in the credits counter, so it'd have to be
+;    queried at boot and then reset, presumably by the main CPU overwriting it
+;    (though you could perform a bunch of decrements if you had to). It's a
+;    mystery why there wouldn't just be a set-to-zero command. $08, which sets
+;    it to ten, doesn't seem to make much sense, unless it's a vestige from a
+;    since-abandoned free-play mode.
 ;
-; Maybe Taito had overlooked that, leading to this being mothballed?
+; 2. Speaking of pricing, where's the command for querying the COIN B price?
+;    There is a parallel of this whole controller (see
+;    PROCESS_CREDITS_CONTROLLER_2), but command $00 on that one's pulling the
+;    same two bits from the DIP switches as this one (a copy/paste bug,
+;    perhaps? Maybe there only used to be one set?)
+;
+;    I _guess_ the purpose for having two controllers is if at some point the
+;    two players had separate credit counts for two-coin-mech configurations?
+;    (Could that relate to the 1/2 WAY signal to the PS4?). We're getting quite
+;    deep in speculation here...
+;
+; 3. It's strange that the clamping would be done at 10. The maximum credits in
+;    the finished game is 9 (maybe they just changed their minds about that).
+;    They're presumably relying on the coin lockouts to prevent the requests
+;    past 10 from coming in, and the main purpose of forcing a clamp is for
+;    use of the service switch.
+;
+; 4. When the pricing for the game is one-coin-two-credits or two-coins-three-
+;    credits, the main CPU would need to queue requests to this API to feed the
+;    credit bumps in one at a time.
+;
+; All of that would make me wonder if this really is a credits count controller,
+; but given that it's pulling the same DIP switch values that
+; PROCESS_PHONY_CREDITS is using for a pricing table, I'm fairly confident.
+; Perhaps these problems are why Taito mothballed it?
+;
+; Just for the record, a complete playthrough of the game showed that the game
+; never attempted to write to the request channel.
 ;
 
 F2A7: CE 0C 6F ldx  #$0C6F                   ; We'll be reading [$c6f]
@@ -1034,11 +1063,12 @@ F2C3: C1 42    cmpb #$42
 F2C5: 26 0C    bne  $F2D3                    ; rts
 
 ; [$f95] was $42. Read [$c24]. If it doesn't match the contents of $0052 (which
-; was trying to cache what [$c24] was being set to) push the A register onto
+; was trying to cache what [$c24] was being set to), push the A register onto
 ; the stack and then try rts -- which would crash because the top of the stack
 ; just had that register value pushed to it. I'm guessing that was intentional,
-; so a debugger could kick in, though the value pushed on the stack wouldn't
-; have been instructive.
+; either so a debugger could kick in during development (though the value pushed
+; on the stack wouldn't be instructive), or to frustrate efforts to reverse-
+; engineer the PS4. In either case, why the [$f95] == $42 check?
 ;
 F2C7: CE 0C 24 ldx  #$0C24
 F2CA: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
@@ -1121,9 +1151,9 @@ F33F: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F342: 39       rts  
 
 ;
-; A small table, used by PROCESS_C6F and PROCESS_C70 to translate DIP switch
-; combos for pricing into bit fields (which they'd almost certainly not need to
-; be)
+; A small table, used by PROCESS_CREDITS_CONTROLLER_1 and
+; PROCESS_CREDITS_CONTROLLER_2 to translate DIP switch combos for pricing into
+; bit fields (which they'd almost certainly not need to be)
 ;
 
 F343: 01       .byte $01
@@ -1133,18 +1163,15 @@ F346: 02       .byte $02
 
 
 ;
-; PROCESS_C70:
+; PROCESS_CREDITS_CONTROLLER_2:
 ; (Called from IRQ_HANDLER)
 ;
-; Appears parallel to PROCESS_C6F, but with:
+; Appears parallel to PROCESS_CREDITS_CONTROLLER_1, but with:
 ;   - [$c70] instead of [$c6f]
 ;   - [$c25] instead of [$c24]
 ;   - $0053  instead of $0052
 ;
-; Interestingly, it's such a copy/paste of PROCESS_C6F that it also uses the
-; COIN A price DIPs, rather than shifting extra places, like
-; PROCESS_PHONY_CREDITS does, to get COIN B prices. Meaning nothing in this
-; (abandoned) set of routines would look at COIN B prices.
+; See the PROCESS_CREDITS_CONTROLLER_1 comments for explanation.
 ;
 ; The CPU wasn't seen activating this one during a playthrough either.
 ;
@@ -1220,32 +1247,43 @@ F3E2: 39       rts                           ; (See routine at $f2a7)
 
 
 ;
-; PROCESS_C7E:
+; PROCESS_LEVEL_CONTROLLER:
 ; (Called from IRQ_HANDLER)
 ;
-; Sets [$c26] and $0054 based on value of [$c7e]. Don't know what this was
-; intended for, as, in my experience, the main CPU never attempts a write to
-; [$c7e], nor a read from [$c26] (outside of bootup RAM test).
+; Analogous to PROCESS_CREDITS_CONTROLLER_1 and PROCESS_CREDITS_CONTROLLER_2
+; in that it monitors an events channel for commands, manipulates a value
+; that it writes to an output channel, clears the notification, and caches the
+; result. But different in what its values relate to. Whereas those two look
+; like they're a controller for a credits count, this one behaves as follows:
 ;
-; $0054 also seems to be used in PROCESS_CREDITS_MISCHIEF.
+;   [$c7e] == $01: sets [$c26] to $00 (0)
+;             $02: increments [$c26]
+;             $04: sets [$c26] to $31 (49)
+;             $08: sets [$c26] to $62 (98)
+;             $10: sets [$c26] to $63 (99)
+;             $20: sets [$c26] to $64 (100)
+;             $40: sets [$c26] to $65 (101)
 ;
+;   ($0054 is used for the cached result)
 ;
-; Current [$c7e] value | New [$c26] and $0054 value | New [$c7e] value
-; ---------------------|----------------------------|-----------------
-;                  $01 |                        $00 |              $00
-;                  $02 |   incremented [$c26] value |              $00
-;                  $04 |                        $31 |              $00
-;                  $08 |                        $62 |              $00
-;                  $10 |                        $63 |              $00
-;                  $20 |                        $64 |              $00
-;                  $40 |                        $65 |              $00
-;                other |                  unchanged |        unchanged
+; To me, these look like the commands you'd need for a level controller:
 ;
-; In the 'other' case, will crash if [$f95] is $42 and [$c26] doesn't match
-; contents of $0054
+; - The first would start the game on level 1 (which would be 0 if zero-
+;   indexed).
+; - The second would advance a level, on stage clear or through an umbrella.
+;   We can only advance one stage per frame using this API, but the umbrella's
+;   not nearly that quick.
+; - The third would be the zap-back to level 50 (zero-indexed, remember) if you
+;   complete the game in 1-player mode.
+;
+; Why you'd need additional ones to reach levels 99, 100, 101 (the ending
+; screen) and 102 (does not exist) I can't explain, but it seems conspicuous
+; that these numbers correspond to the last few levels in the game.
+;
+; Note that the $0054 cache destination is read by PROCESS_CREDITS_MISCHIEF.
 ;
 
-F3E3: CE 0C 7E ldx  #$0C7E
+F3E3: CE 0C 7E ldx  #$0C7E                   ; Address of command
 F3E6: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F3E9: C1 01    cmpb #$01                     ; If $01..
 F3EB: 27 2F    beq  $F41C                    ;       ..go to $f41c
@@ -1344,7 +1382,7 @@ F48D: 20 C4    bra  $F453                    ; Common ending
 
 
 ;
-; PROCESS_P1_BEASTIES:
+; PROCESS_BEASTIES_FOR_P1:
 ; (Called from IRQ_HANDLER)
 ;
 ; This is for player 1. Note that the code in $f585 onwards does player 2, and
@@ -1564,7 +1602,7 @@ F582: 7E F1 DB jmp  $F1DB                    ; Call P_CPU_BUS_WRITE and return
 
 
 ;
-; PROCESS_P2_BEASTIES:
+; PROCESS_BEASTIES_FOR_P2:
 ; (Called from IRQ_HANDLER)
 ;
 ; This is for player 2. Note that the code in $f48f onwards does player 1,
@@ -2357,14 +2395,20 @@ F8D2: 7E F1 DB jmp  $F1DB                    ; Call P_CPU_BUS_WRITE and return
 ; PROCESS_CREDITS_MISCHIEF:
 ; (Called from IRQ_HANDLER)
 ;
-; Sets the phony credits count to 42 if [$c71] is $0d, and $0054 is $0c
+; Sets the credits count (if the PROCESS_PHONY_CREDITS controller was in use) to
+; 42 if [$c71] (an enabler, presumably) is $0d, and $0054 (the current level
+; number, if the PROCESS_LEVEL_CONTROLLER was in use) is 12 (meaning level 13.
+; Appropriate!)
 ;
 ; I suspect this might be an attempt at sabotage, like to make the machine
 ; spontaneously award free credits if it suspects its integrity is compromised.
-; It's certainly the kind of number that could be used in a prank...
+; They're certainly the kind of numbers that have... cultural significance.
 ;
-; How would it work though? Perhaps if you had a real PS4, but the main CPU's
-; ROM checksum doesn't check out or something? Hard to imagine.
+; I'm not sure how this would work though. Given that the PS4 is the opaque
+; part, you'd want the main CPU to be initiating the sabotage if it suspects a
+; compromised PS4, not the other way around. Or rather, have the main CPU code
+; sleepwalk towards disaster, with the PS4 taking unexpected action to divert
+; it.
 ;
 
 F8D5: CE 0C 71 ldx  #$0C71                   ; Read [$c71]
@@ -3030,15 +3074,18 @@ FEBA: 0A       .byte $0A
 ;
 ; CONFIGURE_MCU:
 ;
-; Bulk of the cold start routine, jumped to immediately from the actual start of
-; the cold start handler ($f000). It's concerned with configuring the ports and
-; features of the microcontroller.
+; The bulk of the cold start routine, jumped to immediately from the cold boot
+; handler ($f000). It's concerned with configuring the ports and features of the
+; microcontroller.
+;
+; I don't feel inclined to further reverse-engineer this routine: it's just
+; doing setup. I doubt there's anything mysterious about it.
 ;
 
-FEBB: 8E 00 FF lds  #$00FF
-FEBE: 0F       sei  
+FEBB: 8E 00 FF lds  #$00FF                   ; Set stack pointer
+FEBE: 0F       sei                           ; Disable interrupts
 FEBF: 86 AF    lda  #$AF
-FEC1: 97 0F    sta  $0F
+FEC1: 97 0F    sta  $0F                      ; Port 3 control and status register
 
 ; Initialize timers, serial port
 ;
