@@ -210,7 +210,7 @@
 ; [$c80](r)  - Seems unused (input to creeper for [$c81])
 ; [$c81](w)  - Seems unused (output from creeper for [$c80])
 ;
-; -- Clock ---------------------------------------------------------------------
+; -- Clock special item --------------------------------------------------------
 ;
 ; [$c78](rw) - Clock downcounter low byte
 ; [$c79](rw) - Clock downcounter high byte
@@ -379,7 +379,8 @@
 ; Run on boot, pointed to by the reset vector at $fffe
 ;
 
-F000: 7E FE BB jmp  $FEBB                    ; Jump to CONFIGURE_MCU
+F000: 7E FE BB jmp  $FEBB                    ; Jump to CHECK_FOR_FACTORY_TEST
+                                             ; (which in turn jumps to..)
 F003: 8E 00 FF lds  #$00FF                   ; Set stack pointer (already done)
 F006: 0F       sei                           ; Disable interrupts (already done)
 F007: 86 F0    lda  #$F0
@@ -454,7 +455,7 @@ F07C: BD F2 99 jsr  $F299                    ; Call PROCESS_RESET_REQUEST
 F07F: CE 0F 96 ldx  #$0F96                   ; Read [$f96]
 F082: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F085: C1 47    cmpb #$47                     ; If $47..
-F087: 27 08    beq  $F091                    ;      ..skip the cycle burn
+F087: 27 08    beq  $F091                    ;       ..skip the cycle burn
 F089: CC 01 70 ldd  #$0170                   ; Burn cycles: iterate through $170 (368) empty loops
 F08C: 83 00 01 subd #$0001                   ; Decrement loop counter
 F08F: 26 FB    bne  $F08C                    ; Loop
@@ -602,6 +603,9 @@ F132: BD F1 DB jsr  $F1DB                    ; (See routine at $f0b3)
 
 ;
 ; SERVICE handler
+;
+; ('Service' the Japanese word, meaning 'free', not the English word meaning
+; 'maintenance'. This is a cabinet control for giving free credits.)
 ;
 
 F135: B6 00 45 lda  $0045                    ; Fetch SERVICE change code
@@ -790,7 +794,7 @@ F1C5: 7F 00 04 clr  $0004
 
 ; Put out the address with /SORAM low. Then set /SORAM high to kick off the request.
 ;
-F1C8: FF 00 4A stx  $004A                    ; Stash shared RAM address in $004a..
+F1C8: FF 00 4A stx  $004A                    ; Stash shared RAM address in $004a/b
 F1CB: FC 00 4A ldd  $004A                    ; ..maybe just to move X to A and B?
 F1CE: 84 0F    anda #$0F                     ; Mask out upper nibble of address
 F1D0: D7 07    stb  $07                      ; Put address low byte on port 4 (address bus lower)
@@ -825,7 +829,7 @@ F1E1: 86 FF    lda  #$FF
 F1E3: 97 04    sta  $04
 
 F1E5: D7 06    stb  $06                      ; Put byte to write on the data bus
-F1E7: FF 00 4A stx  $004A                    ; Stash shared RAM address in $004a..
+F1E7: FF 00 4A stx  $004A                    ; Stash shared RAM address in $004a/b
 F1EA: FC 00 4A ldd  $004A                    ; ..maybe just to move X to A and B?
 F1ED: 84 0F    anda #$0F                     ; Mask out upper nibble of address
 F1EF: D7 07    stb  $07                      ; Put address low byte on port 4 (address bus lower)
@@ -837,9 +841,10 @@ F1F7: 39       rts
 
 ;
 ; INTERRUPT_MAIN_CPU:
+; (Called from IRQ_HANDLER and at startup)
 ;
-; The first routine called from IRQ_HANDLER. This generates an interrupt on the
-; main CPU, but only if the magic number $47 has been written to [$f98].
+; This generates an interrupt on the main CPU, but only if the magic number $47
+; has been written to [$f98].
 ;
 ; Without this routine, the main game would be frozen.
 ;
@@ -990,7 +995,7 @@ F299: CE 0F 97 ldx  #$0F97                   ; Read [$f97]
 F29C: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F29F: C1 4A    cmpb #$4A                     ; Is $4a?
 F2A1: 26 03    bne  $F2A6                    ; If not, return
-F2A3: 7E F0 00 jmp  $F000                    ; Cold boot
+F2A3: 7E F0 00 jmp  $F000                    ; Warm boot
 F2A6: 39       rts
 
 
@@ -1004,7 +1009,7 @@ F2A6: 39       rts
 ; Not to be confused with the one at [$c1e] that PROCESS_PHONY_CREDITS manages.
 ; That one's a whole system that bumps the credits count as coins come in,
 ; translates their values using the DIP switches, and manages the lockouts.
-; This one's an alternative, simpler, and incompatible, solution, which acts as
+; This one's an alternative, simpler, and incompatible solution, which acts as
 ; an API for the main CPU to manipulate a credits count. Neither got used.
 ;
 ; Using [$c6f] as a request channel, the behavior of this routine is:
@@ -1420,9 +1425,9 @@ F4A8: CE 0C 61 ldx  #$0C61                   ; Point X to the player's X positio
 F4AB: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F4AE: F7 00 56 stb  $0056                    ; Store X position in $0056
 F4B1: CC 0C 01 ldd  #$0C01                   ; Store pointer to first beastie input structure..
-F4B4: FD 00 58 std  $0058                    ; ..in $0058
+F4B4: FD 00 58 std  $0058                    ; ..in $0058/9
 F4B7: CC 0C 27 ldd  #$0C27                   ; Store pointer to first beastie output structure..
-F4BA: FD 00 5A std  $005A                    ; ..in $005a
+F4BA: FD 00 5A std  $005A                    ; ..in $005a/b
 F4BD: 7F 00 5C clr  $005C                    ; Reset count of Y overlaps
 
 ; Loop start for beastie iteration
@@ -3086,74 +3091,101 @@ FEBA: 0A       .byte $0A
 
 
 ;
-; CONFIGURE_MCU:
+; CHECK_FOR_FACTORY_TEST:
 ;
-; The bulk of the cold start routine, jumped to immediately from the cold boot
-; handler ($f000). It's concerned with configuring the ports and features of the
-; microcontroller.
-;
-; I don't feel inclined to further reverse-engineer this routine: it's just
-; doing setup. I doubt there's anything mysterious about it.
+; If the ports are showing a test pattern that would only be seen on the factory
+; test rig, enter test mode. Otherwise, return to the normal boot sequence.
 ;
 
+; Basic initialization
+;
 FEBB: 8E 00 FF lds  #$00FF                   ; Set stack pointer
 FEBE: 0F       sei                           ; Disable interrupts
 FEBF: 86 AF    lda  #$AF
 FEC1: 97 0F    sta  $0F                      ; Port 3 control and status register
 
-; Initialize timers, serial port
+; Initialize timers and serial port
 ;
 FEC3: 7F 00 08 clr  $0008                    ; Reset timer control and status register
 FEC6: 7F 00 17 clr  $0017                    ; Reset timer control register 1
 FEC9: 7F 00 18 clr  $0018                    ; Reset timer control register 2
 FECC: 7F 00 11 clr  $0011                    ; Reset transmit/receive control and status register
 FECF: 7F 00 19 clr  $0019                    ; Reset timer status register
-FED2: CC 00 A0 ldd  #$00A0
-FED5: DD 0B    std  $0B                      ; Output compare register (high byte)
-FED7: CC 00 00 ldd  #$0000
-FEDA: DD 1A    std  $1A                      ; Output compare register 2 (high byte)
-FEDC: CC 20 00 ldd  #$2000
-FEDF: DD 1C    std  $1C                      ; Output compare register 3 (high byte)
-FEE1: 86 AA    lda  #$AA
-FEE3: 16       tab  
-FEE4: 91 02    cmpa $02                      ; Port 1 data register
-FEE6: 26 55    bne  $FF3D
-FEE8: 91 07    cmpa $07                      ; Port 4 data register
-FEEA: 26 51    bne  $FF3D
-FEEC: 96 03    lda  $03                      ; Port 2 data register
-FEEE: 84 1F    anda #$1F
-FEF0: 81 0A    cmpa #$0A
-FEF2: 26 49    bne  $FF3D
-FEF4: 17       tba  
-FEF5: 91 06    cmpa $06                      ; Port 3 data register
-FEF7: 26 44    bne  $FF3D
-FEF9: 86 55    lda  #$55
-FEFB: 16       tab  
-FEFC: 91 02    cmpa $02                      ; Port 1 data register
-FEFE: 26 3D    bne  $FF3D
-FF00: 91 07    cmpa $07                      ; Port 4 data register
-FF02: 26 39    bne  $FF3D
-FF04: 96 03    lda  $03                      ; Port 2 data register
-FF06: 84 1F    anda #$1F
-FF08: 81 15    cmpa #$15
-FF0A: 26 31    bne  $FF3D
-FF0C: 17       tba  
-FF0D: 91 06    cmpa $06                      ; Port 3 data register
-FF0F: 26 2C    bne  $FF3D
-FF11: 86 FF    lda  #$FF
-FF13: 97 00    sta  $00                      ; Port 1 data direction register
-FF15: 97 01    sta  $01                      ; Port 2 data direction register
-FF17: 97 04    sta  $04                      ; Port 3 data direction register
-FF19: 97 05    sta  $05                      ; Port 4 data direction register
+FED2: CC 00 A0 ldd  #$00A0                   ; Store..
+FED5: DD 0B    std  $0B                      ; ..$00 in output compare register (high byte)
+                                             ; ..$a0 in output compare register (low byte)
+FED7: CC 00 00 ldd  #$0000                   ; Store..
+FEDA: DD 1A    std  $1A                      ; ..$00 in output compare register 2 (high byte)
+                                             ; ..$00 in output compare register 2 (low byte)
+FEDC: CC 20 00 ldd  #$2000                   ; Store..
+FEDF: DD 1C    std  $1C                      ; ..$20 in output compare register 3 (high byte)
+                                             ; ..$00 in output compare register 3 (low byte)
 
-FF1B: 86 BF    lda  #$BF
-FF1D: 97 0F    sta  $0F                      ; Port 3 control and status register
+; We now look for a very specific pattern of values on the ports (odd-numbered 
+; bits set), followed by another very specific pattern (even-numbered bits). If
+; we see exactly the right patterns, at exactly the right times, enter test
+; mode.
+;
+; If there's any deviation, proceed straight to normal bootup.
+;
+FEE1: 86 AA    lda  #$AA                     ; Odd-numbered bits pattern
+FEE3: 16       tab                           ; Stash $aa in B
+FEE4: 91 02    cmpa $02                      ; Does port 1 data register == $aa?
+FEE6: 26 55    bne  $FF3D                    ; If not, go to NOT_FACTORY_TEST
+FEE8: 91 07    cmpa $07                      ; Does port 4 data register == $aa?
+FEEA: 26 51    bne  $FF3D                    ; If not, go to NOT_FACTORY_TEST
 
-FF1F: 86 0F    lda  #$0F
-FF21: 97 02    sta  $02                      ; Port 1 data register
-FF23: 97 03    sta  $03                      ; Port 2 data register
-FF25: 97 07    sta  $07                      ; Port 4 data register
-FF27: 97 06    sta  $06                      ; Port 3 data register
+FEEC: 96 03    lda  $03                      ; Does port 2 data register..
+FEEE: 84 1F    anda #$1F                     ; ..& $1f
+FEF0: 81 0A    cmpa #$0A                     ; ..equal $0a?
+FEF2: 26 49    bne  $FF3D                    ; If not, go to NOT_FACTORY_TEST
+
+FEF4: 17       tba                           ; Retrieve stashed $aa
+FEF5: 91 06    cmpa $06                      ; Does port 3 data register == $aa?
+FEF7: 26 44    bne  $FF3D                    ; If not, go to NOT_FACTORY_TEST
+
+FEF9: 86 55    lda  #$55                     ; Even-numbered bits pattern
+FEFB: 16       tab                           ; (See routine at $fee1)
+FEFC: 91 02    cmpa $02                      ; (See routine at $fee1)
+FEFE: 26 3D    bne  $FF3D                    ; (See routine at $fee1)
+FF00: 91 07    cmpa $07                      ; (See routine at $fee1)
+FF02: 26 39    bne  $FF3D                    ; (See routine at $fee1)
+FF04: 96 03    lda  $03                      ; (See routine at $fee1)
+FF06: 84 1F    anda #$1F                     ; (See routine at $fee1)
+FF08: 81 15    cmpa #$15                     ; (See routine at $fee1)
+FF0A: 26 31    bne  $FF3D                    ; (See routine at $fee1)
+FF0C: 17       tba                           ; (See routine at $fee1)
+FF0D: 91 06    cmpa $06                      ; (See routine at $fee1)
+FF0F: 26 2C    bne  $FF3D                    ; (See routine at $fee1)
+; Falls through...
+
+
+;
+; FACTORY_TEST:
+;
+; The remaining code exercises aspects of the MCU's core functionality, as a
+; self-test. Come what may, we'll end up at HANG, but if all the tests pass, we
+; output a pattern of bits on the ports to communicate success.
+;
+
+; Configure all ports for output
+;
+FF11: 86 FF    lda  #$FF                     ; Write $ff to..
+FF13: 97 00    sta  $00                      ; ..port 1 data direction register
+FF15: 97 01    sta  $01                      ; ..port 2 data direction register
+FF17: 97 04    sta  $04                      ; ..port 3 data direction register
+FF19: 97 05    sta  $05                      ; ..port 4 data direction register
+
+FF1B: 86 BF    lda  #$BF                     ; Write $bf to..
+FF1D: 97 0F    sta  $0F                      ; ..port 3 control and status register
+
+; Communicate to test rig that we're starting the tests
+;
+FF1F: 86 0F    lda  #$0F                     ; Write $0f to..
+FF21: 97 02    sta  $02                      ; ..port 1 data register
+FF23: 97 03    sta  $03                      ; ..port 2 data register
+FF25: 97 07    sta  $07                      ; ..port 4 data register
+FF27: 97 06    sta  $06                      ; ..port 3 data register
 
 ; Loop
 FF29: 96 19    lda  $19                      ; Timer status register
@@ -3161,73 +3193,94 @@ FF2B: 84 08    anda #$08
 FF2D: 26 02    bne  $FF31
 FF2F: 20 F8    bra  $FF29                    ; Loop
 
-FF31: 86 F0    lda  #$F0
-FF33: 97 02    sta  $02                      ; Port 1 data register
-FF35: 97 03    sta  $03                      ; Port 2 data register
-FF37: 97 07    sta  $07                      ; Port 4 data register
-FF39: 97 06    sta  $06                      ; Port 3 data register
-FF3B: 20 03    bra  $FF40
-
-; This is the success point, where we can return to the main setup
+; Communicate to test rig that we're moving on to the next phase
 ;
-FF3D: 7E F0 03 jmp  $F003                    ; Return to boot sequence at $f003
-FF40: 86 00    lda  #$00
-FF42: 16       tab  
-FF43: CE 00 40 ldx  #$0040
-FF46: 3A       abx  
+FF31: 86 F0    lda  #$F0                     ; Write $f0 to..
+FF33: 97 02    sta  $02                      ; ..port 1 data register
+FF35: 97 03    sta  $03                      ; ..port 2 data register
+FF37: 97 07    sta  $07                      ; ..port 4 data register
+FF39: 97 06    sta  $06                      ; ..port 3 data register
+FF3B: 20 03    bra  $FF40                    ; Resume factory-test at $ff40
 
-; Loop
-FF47: C6 A5    ldb  #$A5
-FF49: E7 00    stb  $00,x
-FF4B: 08       inx  
-FF4C: 8C 01 00 cmpx #$0100
-FF4F: 27 16    beq  $FF67                    ; Continue
-FF51: C6 5A    ldb  #$5A
-FF53: E7 00    stb  $00,x
-FF55: 08       inx  
-FF56: 8C 01 00 cmpx #$0100
-FF59: 27 0C    beq  $FF67                    ; Continue
-FF5B: C6 00    ldb  #$00
-FF5D: E7 00    stb  $00,x
-FF5F: 08       inx  
-FF60: 8C 01 00 cmpx #$0100
-FF63: 27 02    beq  $FF67                    ; Continue
-FF65: 20 E0    bra  $FF47                    ; Loop
+;
+; NOT_FACTORY_TEST:
+;
 
-FF67: 16       tab  
-FF68: CE 00 40 ldx  #$0040
-FF6B: 3A       abx  
+FF3D: 7E F0 03 jmp  $F003                    ; Resume boot sequence at $f003
 
-; Loop
-FF6C: C6 A5    ldb  #$A5
-FF6E: E1 00    cmpb $00,x
-FF70: 26 6B    bne  $FFDD
-FF72: 08       inx  
-FF73: 8C 01 00 cmpx #$0100
-FF76: 27 1C    beq  $FF94
-FF78: C6 5A    ldb  #$5A
-FF7A: E1 00    cmpb $00,x
-FF7C: 26 5F    bne  $FFDD
-FF7E: 08       inx  
-FF7F: 8C 01 00 cmpx #$0100
-FF82: 27 10    beq  $FF94
-FF84: C6 00    ldb  #$00
-FF86: E1 00    cmpb $00,x
-FF88: 26 53    bne  $FFDD
-FF8A: 08       inx  
-FF8B: 8C 01 00 cmpx #$0100
-FF8E: 27 04    beq  $FF94
-FF90: D6 19    ldb  $19                      ; Timer status register
-FF92: 20 D8    bra  $FF6C                    ; Loop
+; FACTORY_TEST continues...
+;
 
-FF94: D6 19    ldb  $19                      ; Timer status register
-FF96: CE 00 00 ldx  #$0000
-FF99: DF 1A    stx  $1A                      ; Output compare register 2 (high byte)
+; RAM test
+;
+FF40: 86 00    lda  #$00                     ; Pattern rotation offset = 0
+FF42: 16       tab                           ; (Copy to B)
+
+; RAM test outer loop
+;
+FF43: CE 00 40 ldx  #$0040                   ; X = top of RAM, call it 'current byte'
+FF46: 3A       abx                           ; Add offset to pointer
+
+; RAM test inner loop 1
+;
+; Fill RAM with the pattern $a5, $5a, $00..
+;
+FF47: C6 A5    ldb  #$A5                     ; Write $a5..
+FF49: E7 00    stb  $00,x                    ; ..to the current byte
+FF4B: 08       inx                           ; Advance to next byte
+FF4C: 8C 01 00 cmpx #$0100                   ; Are we at end of RAM?
+FF4F: 27 16    beq  $FF67                    ; If so, skip to $ff67
+FF51: C6 5A    ldb  #$5A                     ; Write $5a..
+FF53: E7 00    stb  $00,x                    ; ..to the current byte
+FF55: 08       inx                           ; Advance to next byte
+FF56: 8C 01 00 cmpx #$0100                   ; Are we at end of RAM?
+FF59: 27 0C    beq  $FF67                    ; If so, skip to $ff67
+FF5B: C6 00    ldb  #$00                     ; Write $00..
+FF5D: E7 00    stb  $00,x                    ; ..to the current byte
+FF5F: 08       inx                           ; Advance to next byte
+FF60: 8C 01 00 cmpx #$0100                   ; Are we at end of RAM?
+FF63: 27 02    beq  $FF67                    ; If so, skip to $ff67
+FF65: 20 E0    bra  $FF47                    ; Repeat inner loop 1
+
+FF67: 16       tab                           ; B = 0
+FF68: CE 00 40 ldx  #$0040                   ; Point current byte back to RAM start
+FF6B: 3A       abx                           ; Add offset to pointer
+
+; RAM test inner loop 2
+;
+; Does RAM still have that $a5, $5a, $00.. pattern?
+;
+FF6C: C6 A5    ldb  #$A5                     ; Is $a5..
+FF6E: E1 00    cmpb $00,x                    ; ..at the current byte?
+FF70: 26 6B    bne  $FFDD                    ; If not, jump to HANG
+FF72: 08       inx                           ; Advance to next byte
+FF73: 8C 01 00 cmpx #$0100                   ; Are we at end of RAM?
+FF76: 27 1C    beq  $FF94                    ; If so, skip to $ff94
+FF78: C6 5A    ldb  #$5A                     ; Is $5a..
+FF7A: E1 00    cmpb $00,x                    ; ..at the current byte?
+FF7C: 26 5F    bne  $FFDD                    ; If not, jump to HANG
+FF7E: 08       inx                           ; Advance to next byte
+FF7F: 8C 01 00 cmpx #$0100                   ; Are we at end of RAM?
+FF82: 27 10    beq  $FF94                    ; If so, skip to $ff94
+FF84: C6 00    ldb  #$00                     ; Is $00..
+FF86: E1 00    cmpb $00,x                    ; ..at the current byte?
+FF88: 26 53    bne  $FFDD                    ; If not, jump to HANG
+FF8A: 08       inx                           ; Advance to next byte
+FF8B: 8C 01 00 cmpx #$0100                   ; Are we at end of RAM?
+FF8E: 27 04    beq  $FF94                    ; If so, skip to $ff94
+FF90: D6 19    ldb  $19                      ; Fetch timer status register (why?)
+FF92: 20 D8    bra  $FF6C                    ; Repeat inner loop 2
+
+FF94: D6 19    ldb  $19                      ; Re-fetch timer status register (why?)
+FF96: CE 00 00 ldx  #$0000                   ; Write $0000
+FF99: DF 1A    stx  $1A                      ; ..to output compare register 2 (high byte)
+                                             ; ..and output compare register 2 (low byte)
 FF9B: CE 20 00 ldx  #$2000
 FF9E: DF 1C    stx  $1C                      ; Output compare register 3 (high byte)
-FFA0: 4C       inca 
-FFA1: 81 03    cmpa #$03
-FFA3: 26 9D    bne  $FF42
+
+FFA0: 4C       inca                          ; Bump pattern offset for RAM test
+FFA1: 81 03    cmpa #$03                     ; Have we done all three rotations?
+FFA3: 26 9D    bne  $FF42                    ; If not, repeat outer loop with pattern shifted
 
 ; Loop
 FFA5: 96 19    lda  $19                      ; Timer status register
@@ -3235,23 +3288,32 @@ FFA7: 84 10    anda #$10
 FFA9: 26 02    bne  $FFAD
 FFAB: 20 F8    bra  $FFA5
 
+; Communicate to test rig that we're moving on to the next phase
+;
 FFAD: 86 AA    lda  #$AA
 FFAF: 97 02    sta  $02                      ; Port 1 data register
 FFB1: 97 03    sta  $03                      ; Port 2 data register
 FFB3: 97 07    sta  $07                      ; Port 4 data register
 FFB5: 97 06    sta  $06                      ; Port 3 data register
-FFB7: CE F0 00 ldx  #$F000
-FFBA: 4F       clra 
-FFBB: 5F       clrb 
-FFBC: E3 00    addd $00,x
-FFBE: 08       inx  
-FFBF: 08       inx  
-FFC0: 8C 00 00 cmpx #$0000
-FFC3: 26 F7    bne  $FFBC
-FFC5: 4D       tsta 
-FFC6: 26 15    bne  $FFDD
-FFC8: 5D       tstb 
-FFC9: 26 12    bne  $FFDD
+
+; This is a copy of the core of CHECKSUM..
+;
+FFB7: CE F0 00 ldx  #$F000                   ; (See routine at $f27a)
+FFBA: 4F       clra                          ; (See routine at $f27a)
+FFBB: 5F       clrb                          ; (See routine at $f27a)
+FFBC: E3 00    addd $00,x                    ; (See routine at $f27a)
+FFBE: 08       inx                           ; (See routine at $f27a)
+FFBF: 08       inx                           ; (See routine at $f27a)
+FFC0: 8C 00 00 cmpx #$0000                   ; (See routine at $f27a)
+FFC3: 26 F7    bne  $FFBC                    ; (See routine at $f27a)
+
+; ..except instead of reporting the sum for the main CPU to consider, we test it
+; ourselves
+;
+FFC5: 4D       tsta                          ; Is sum high byte zero?
+FFC6: 26 15    bne  $FFDD                    ; If not, jump to HANG
+FFC8: 5D       tstb                          ; Is sum low byte zero?
+FFC9: 26 12    bne  $FFDD                    ; If not, jump to HANG
 
 ; Loop
 FFCB: 96 19    lda  $19                      ; Timer status register
@@ -3259,11 +3321,17 @@ FFCD: 84 20    anda #$20
 FFCF: 26 02    bne  $FFD3
 FFD1: 20 F8    bra  $FFCB
 
+; Communicate to test rig that all tests pass
+;
 FFD3: 86 55    lda  #$55
 FFD5: 97 02    sta  $02                      ; Port 1 data register
 FFD7: 97 03    sta  $03                      ; Port 2 data register
 FFD9: 97 07    sta  $07                      ; Port 4 data register
 FFDB: 97 06    sta  $06                      ; Port 3 data register
+
+; HANG:
+; (Ultimate destination of all factory test execution paths)
+;
 FFDD: 20 FE    bra  $FFDD                    ; Loop forever
 
 
