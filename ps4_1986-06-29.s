@@ -34,7 +34,8 @@
 ; For these, the calculations are performed on the PS4, but their results are
 ; ignored by the main CPU. In the case of the beastie collision detection,
 ; there are clear showstopper bugs preventing its use. Some others look like
-; they have flaws, if not major ones.
+; they have flaws, if not major ones. There's also remnants of a time bomb which
+; crashes the PS4 if a value in shared RAM isn't constantly changing.
 ;
 ;
 ; The 6801U4 is a microcontroller variant of the 6800 microprocessor, with 4KiB
@@ -221,8 +222,7 @@
 ; [$c7c](rw) - Which EXTEND bubble the player would be offered if one appeared
 ;              right now
 ; [$c7d](w)  - I/O error reporting. PS4 writes $01 on error.
-; [$c7f](r)  - Seems unused (input for dead code at $f216-$f235)
-
+; [$c7f](r)  - Time bomb defuser (abandoned)
 ; [$c82](w)  - PS4 checksum high byte (game will report error if nonzero)
 ; [$c83](w)  - PS4 checksum low byte  (game will report error if nonzero)
 ; [$c85](w)  - PS4 ready reporting. Main CPU waits for PS4 to write $37 here.
@@ -314,37 +314,37 @@
 ; 
 ; RAM
 ; ---
-; $0040:         Last frame's port 1 data, shifted left 4 bits
-; $0041:         How COIN B has changed since last frame
-; $0042:         Last frame's port 1 data, shifted left 5 bits
-; $0043:         How COIN A has changed since last frame
-; $0044:         Last frame's port 1 data, shifted left 6 bits
-; $0045:         How SERVICE has changed since last frame
-; $0046:         Temporary storage for TRACK_MSB_CHANGE
-; $0048:         Phony unactioned coins count
-;                (An unactioned coin is where the game pricing would be, say,
-;                2-coins-1-credit: after receiving the first coin, this is the
-;                counter we bump). But the whole credits count is phony: the
-;                main CPU doesn't use any of it.
-; $004a, $004b:  Scratch (last shared RAM address read from or written to.)
-; 0004c, $004d:  (Used only by dead code at $f216-$f235)
-; $004e:         Cached controls/DIPs byte 0
-; $004f:         Cached controls/DIPs byte 1 (but never retrieved)
-; $0050:         Cached controls/DIPs byte 2 (but never retrieved)
-; $0051:         Cached controls/DIPs byte 3 (but never retrieved)
-; $0052:         Cached phony credits count 1
-; $0053:         Cached phony credits count 2
-; $0054:         Cached phony level
-; $0055:         Cached player Y position
-; $0056:         Cached player X position
-; $0057:         Number of beastie currently being processed
-; $0058, $0059:  Input structure pointer for current beastie
-; $005a, $005b:  Output structure pointer for current beastie
-; $005c:         Beastie Y overlap accumulator
-; $005d:         Sequence index for the [$c72]->[$c73] creeper
-; $005e:         Sequence index for the [$c74]->[$c75] creeper
-; $005f:         Sequence index for the [$c76]->[$c77] creeper
-; $0060:         Sequence index for the [$c80]->[$c81] creeper
+; $0040:        Last frame's port 1 data, shifted left 4 bits
+; $0041:        How COIN B has changed since last frame
+; $0042:        Last frame's port 1 data, shifted left 5 bits
+; $0043:        How COIN A has changed since last frame
+; $0044:        Last frame's port 1 data, shifted left 6 bits
+; $0045:        How SERVICE has changed since last frame
+; $0046:        Temporary storage for TRACK_MSB_CHANGE
+; $0048:        Phony unactioned coins count
+;               (An unactioned coin is where the game pricing would be, say,
+;               2-coins-1-credit: this is the counter we bump after receiving
+;               the first coin.)
+; $004a-$004b:  Scratch (last P-CPU bus address read from or written to)
+; 0004c:        Time bomb: previous value of [$c7f]
+; $004d:        Time bomb: number of frames with a constant [$c7f]
+; $004e:        Cached controls/DIPs byte 0
+; $004f:        Cached controls/DIPs byte 1 (but never retrieved)
+; $0050:        Cached controls/DIPs byte 2 (but never retrieved)
+; $0051:        Cached controls/DIPs byte 3 (but never retrieved)
+; $0052:        Cached phony credits count 1
+; $0053:        Cached phony credits count 2
+; $0054:        Cached phony level
+; $0055:        Cached player Y position
+; $0056:        Cached player X position
+; $0057:        Number of beastie currently being processed
+; $0058-$0059:  Input structure pointer for current beastie
+; $005a-$005b:  Output structure pointer for current beastie
+; $005c:        Beastie Y overlap accumulator
+; $005d:        Sequence index for the [$c72]->[$c73] creeper
+; $005e:        Sequence index for the [$c74]->[$c75] creeper
+; $005f:        Sequence index for the [$c76]->[$c77] creeper
+; $0060:        Sequence index for the [$c80]->[$c81] creeper
 ;
 ;
 ; Handy reference for MAME debugging
@@ -868,25 +868,39 @@ F215: 39       rts
 
 
 ;
-; This looks like unreachable code. My guess is it was a top-level subroutine,
-; which they first stubbed out by making its first instruction an rts; then they
-; removed the links to it. Given that it's doing stuff with the status register,
-; possibly something vestigial from debugging?
+; TIME_BOMB:
+; (Not called from anywhere)
 ;
-F216: 39       rts  
-F217: CE 0C 7F ldx  #$0C7F
+; Crashes the PS4 if [$c7f] hasn't changed after ten frames, presumably to
+; frustrate efforts to reverse-engineer it through experimentation.
+;
+
+; Routine starts with an rts. In other words, if anyone even tries linking to
+; it, don't let it run. They really got cold feet on this one!
+;
+F216: 39       rts                           ; Exit
+F217: CE 0C 7F ldx  #$0C7F                   ; Retrieve [$c7f]
 F21A: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
-F21D: F1 00 4C cmpb $004C
-F220: 07       tpa  
-F221: F7 00 4C stb  $004C
-F224: 06       tap  
-F225: 26 0B    bne  $F232
-F227: 7C 00 4D inc  $004D
-F22A: B6 00 4D lda  $004D
-F22D: 81 0A    cmpa #$0A
-F22F: 25 04    bcs  $F235                    ; Return early
-F231: 36       psha 
-F232: 7F 00 4D clr  $004D
+F21D: F1 00 4C cmpb $004C                    ; Does [$c7f] match last frame's value?
+F220: 07       tpa                           ; Stash the status register in A
+F221: F7 00 4C stb  $004C                    ; Store this frame's [$c7f] for next time
+F224: 06       tap                           ; Retrieve stashed status register
+F225: 26 0B    bne  $F232                    ; If [$c7f] had changed, skip to $f232
+
+; [$c7f] hadn't changed since last frame. Increment the count of how long its
+; static run has been.
+;
+F227: 7C 00 4D inc  $004D                    ; Increment run counter
+F22A: B6 00 4D lda  $004D                    ; Fetch that count into A
+F22D: 81 0A    cmpa #$0A                     ; Was it bigger than 10?
+F22F: 25 04    bcs  $F235                    ; If not, return
+F231: 36       psha                          ; If so, trash the stack
+
+; At this point, either [$c7f] hasn't been static for more than ten frames,
+; or it has and the stack has been trashed, causing the upcoming rts to set the
+; PC to some unmapped address.
+;
+F232: 7F 00 4D clr  $004D                    ; Reset the static-run length
 F235: 39       rts  
 
 
