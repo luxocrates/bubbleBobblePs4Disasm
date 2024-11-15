@@ -16,13 +16,13 @@
 ;   - interfacing with player controls, DIP switches, coin mechanisms and the
 ;     cabinet's 'service' switch
 ;   - informing the beasties of where the players are
-;   - rotating which EXTEND bubbles the players are given
+;   - rotating which EXTEND bubbles the players are presented
 ;   - effecting functionality for the clock special item
 ;   - generating interrupts on the main CPU
 ;
 ; Suffice it to say, one does not _need_ a microcontroller to do any of the
 ; above. The PS4's real purpose is to move some vital functionality behind an
-; opaque curtain. However, it seems obvious from the code that Taito had
+; opaque curtain. However, it seems obvious from the disassembly that Taito had
 ; intended for more functionality to be hosted on the PS4 than just the above.
 ; Specifically, we see routines and data hookups for the PS4 to...
 ;
@@ -133,8 +133,8 @@
 ;
 ; The main CPU tracks the credits count itself (not in shared RAM), but after
 ; incrementing it following a coin insertion, it does update this value. It's
-; not clear why, and that seems to be the only time the CPU updates the value:
-; it doesn't decrement it on game start.
+; not clear why, and that seems to be the only time the main CPU updates the
+; value: it doesn't decrement it on game start.
 ;
 ; -- Relayed input ports -------------------------------------------------------
 ;
@@ -177,17 +177,18 @@
 ; -- Player structure ----------------------------------------------------------
 ;
 ; [$c5f](r)  - Player 1 phony liveness (bit 0)
-;              Most likely intended as a way for the CPU to tell the PS4 that
-;              player 1 is alive, but effectively unused. Gets set to $01 at
-;              start of gameplay, and the PS4 won't do processing for beasties
-;              unless it is $01, but nothing ever seems to reset it to zero.
+;              Most likely intended as a way for the main CPU to tell the PS4
+;              that player 1 is alive, but effectively unused. Gets set to $01
+;              at start of gameplay, and the PS4 won't do processing for
+;              beasties unless it is $01, but nothing ever seems to reset it to
+;              zero.
 ; [$c60](r)  - Player 1 Y position
 ; [$c61](r)  - Player 1 X position
 ; [$c62](w)  - Player 1 kill switch (seems unused)
-;              Most likely intended as a way for the PS4 to tell the CPU to kill
-;              off player 1, but collision detection code was botched, so the
-;              CPU disregards this value. Likely, this is why [$c5f] isn't
-;              really used.
+;              Most likely intended as a way for the PS4 to tell the main CPU to
+;              kill off player 1, but the collision detection code was botched,
+;              so the main CPU disregards this value. Likely, this is why [$c5f]
+;              isn't really used.
 ; [$c63](w) -  Index of beastie that the bugged collision detector thinks
 ;              collided with the player
 ;
@@ -271,46 +272,31 @@
 ;
 ; (From manual, Table 4 on page 3-147)
 ;
-; $0000: Port 1 data direction register
-; $0001: Port 2 data direction register
-; $0002: Port 1 data register
-; $0003: Port 2 data register
-;
-; $0004: Port 3 data direction register
-; $0005: Port 4 data direction register
-; $0006: Port 3 data register
-; $0007: Port 4 data register
-;
-; $0008: Timer control and status register
-; $0009: Counter (high byte)
-; $000a: Counter (low byte)
-; $000b: Output compare register (high byte)
-;
-; $000c: Output compare register (low byte)
-; $000d: Input capture register (high byte)
-; $000e: Input capture register (low byte)
-; $000f: Port 3 control and status register
-;
-; $0010: Rate and mode control register
-; $0011: Transmit/receive control and status register
-; $0012: Receive data register
-; $0013: Transmit data register
-;
-; $0014: RAM control register
-; $0015: Counter alternate address (high byte)
-; $0016: Counter alternate address (low byte)
-; $0017: Timer control register 1
-;
-; $0018: Timer control register 2
-; $0019: Timer status register
-; $001a: Output compare register 2 (high byte)
-; $001b: Output compare register 2 (low byte)
-;
-; $001c: Output compare register 3 (high byte)
-; $001d: Output compare register 3 (low byte)
-; $001e: Input capture register 2 (high byte)
-; $001f: Input capture register 2 (low byte)
-;
+; $0000:        Port 1 data direction register
+; $0001:        Port 2 data direction register
+; $0002:        Port 1 data register
+; $0003:        Port 2 data register
+; $0004:        Port 3 data direction register
+; $0005:        Port 4 data direction register
+; $0006:        Port 3 data register
+; $0007:        Port 4 data register
+; $0008:        Timer control and status register
+; $0009-$000a:  Counter
+; $000b-$000c:  Output compare register
+; $000d-$000e:  Input capture register
+; $000f:        Port 3 control and status register
+; $0010:        Rate and mode control register
+; $0011:        Transmit/receive control and status register
+; $0012:        Receive data register
+; $0013:        Transmit data register
+; $0014:        RAM control register
+; $0015-$0016:  Counter alternate address
+; $0017:        Timer control register 1
+; $0018:        Timer control register 2
+; $0019:        Timer status register
+; $001a-001b:   Output compare register 2
+; $001d-$001c:  Output compare register 3
+; $001e-$001f:  Input capture register 2
 ; 
 ; RAM
 ; ---
@@ -383,13 +369,13 @@ F000: 7E FE BB jmp  $FEBB                    ; Jump to CHECK_FOR_FACTORY_TEST
                                              ; (which in turn jumps to..)
 F003: 8E 00 FF lds  #$00FF                   ; Set stack pointer (already done)
 F006: 0F       sei                           ; Disable interrupts (already done)
-F007: 86 F0    lda  #$F0
-F009: 97 00    sta  $00                      ; Set port 1 data direction register
-F00B: 86 FF    lda  #$FF
-F00D: 97 01    sta  $01                      ; Set port 2 data direction register
-F00F: 97 04    sta  $04                      ; Set port 3 data direction register
-F011: 97 05    sta  $05                      ; Set port 4 data direction register
-F013: 86 BF    lda  #$BF                     ; Store $bf..
+F007: 86 F0    lda  #$F0                     ; Set 'bits 0-3 incoming; bits 4-7 outgoing' to..
+F009: 97 00    sta  $00                      ; ..port 1 data direction register
+F00B: 86 FF    lda  #$FF                     ; Set 'all bits outgoing' to..
+F00D: 97 01    sta  $01                      ; ..port 2 data direction register
+F00F: 97 04    sta  $04                      ; ..port 3 data direction register
+F011: 97 05    sta  $05                      ; ..port 4 data direction register
+F013: 86 BF    lda  #$BF                     ; Store $bf (enable latch, disable interrupts)..
 F015: 97 0F    sta  $0F                      ; ..into port 3 control and status register
 F017: 7F 00 08 clr  $0008                    ; Clear timer control and status register
 F01A: 7F 00 17 clr  $0017                    ; Clear timer control register 1
@@ -423,6 +409,9 @@ F042: 0E       cli                           ; Enable interrupts
 ; This is where it spins when the handler's done.
 ;
 F043: 20 FE    bra  $F043                    ; Branch-to-self
+
+; As far as I can tell, this is the _only_ unused byte in the whole ROM
+;
 F045: 01       nop  
 
 
@@ -452,6 +441,8 @@ F076: BD F9 3D jsr  $F93D                    ; Call PROCESS_TRANSLATOR_F8C
 F079: BD F9 77 jsr  $F977                    ; Call PROCESS_TRANSLATOR_F90
 F07C: BD F2 99 jsr  $F299                    ; Call PROCESS_RESET_REQUEST
 
+                                             ; Conspicuously don't call PROCESS_TIME_BOMB
+
 F07F: CE 0F 96 ldx  #$0F96                   ; Read [$f96]
 F082: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F085: C1 47    cmpb #$47                     ; If $47..
@@ -471,8 +462,8 @@ F091: 3B       rti                           ; Done: return to IDLE
 ; DIP switches, manages the coin lockouts to prevent excessive credits, and
 ; sends events to the main CPU when the count changes. The one thing it doesn't
 ; do is decrement the count when a game starts -- presumably they're expecting
-; the CPU to do that, but that introduces a critical section issue that could
-; cause an incoming coin to not register.
+; the main CPU to do that, but that introduces a critical section issue that
+; could cause an incoming coin to not register.
 ;
 ; Kicker: all of this code is completely inconsequential. The main CPU manages
 ; its own credits count, using only the coin information relayed by RELAY_PORTS.
@@ -722,8 +713,9 @@ F18D: 01 01    .byte $01,$01                 ; 1 coin  1 credit
 
 ;
 ; SET_OUT_AND_1_2_WAY:
+; (Called from RESET)
 ;
-; Called from RESET. Configures the OUT and 1/2 WAY outputs to coin mechs.
+; Configures the OUT and 1/2 WAY outputs to the coin mechs
 ; 
 
 F18F: 86 20    lda  #$20                     ; $20 = OUT and 1/2 WAY bits
@@ -757,11 +749,20 @@ F1AF: 39       rts
 
 ;
 ; PROCESS_COIN_LOCKOUTS:
+; (Called from IRQ_HANDLER)
 ;
-; A routine called from IRQ_HANDLER. Receives signals from the main CPU to
-; enable or disable the coin lockouts. The game engages the lockouts once the
-; ninth credit has been inserted, disengaging it as soon as the game then
-; starts.
+; Takes commands from the main CPU to engage or disengage the coin lockouts,
+; which it issues every frame.
+;
+; There's a big problem with this: it's called right after the abandoned
+; PROCESS_PHONY_CREDITS, overwriting whichever lockout setting it's just applied
+; one routine ago. Because the credits count that PROCESS_PHONY_CREDITS uses
+; doesn't get decremented on starting a game, we have a conflict when the ninth
+; credit is inserted and the game is then started. PROCESS_PHONY_CREDITS will
+; engage the lockouts because it thinks there are still nine credits; the main
+; CPU's credit counter will then disengage them because the actual number is
+; eight. In this scenario, the lockouts would get pulsed at 60Hz (albeit with
+; a short 'on' window). That can't be good for them! Or the drivers.
 ;
 
 F1B0: CE 0F 94 ldx  #$0F94                   ; [$f94] is coin lockout instruction
@@ -873,7 +874,7 @@ F215: 39       rts
 
 
 ;
-; TIME_BOMB:
+; PROCESS_TIME_BOMB:
 ; (Not called from anywhere)
 ;
 ; Crashes the PS4 if [$c7f] hasn't changed after ten frames, presumably to
@@ -911,7 +912,7 @@ F235: 39       rts
 
 ;
 ; RELAY_PORTS:
-; (Called from IRQ_HANDLER and at startup)
+; (Called from IRQ_HANDLER and RESET)
 ;
 ; Copies the cabinet interface (I/O pins on port 1) and player controls/DIP
 ; switches (memory-mapped via the P-CPU bus) to shared RAM locations where the
@@ -1192,7 +1193,7 @@ F346: 02       .byte $02
 ;
 ; See the PROCESS_CREDITS_CONTROLLER_1 comments for explanation.
 ;
-; The CPU wasn't seen activating this one during a playthrough either.
+; The main CPU wasn't seen activating this one during a playthrough either.
 ;
 
 F347: CE 0C 70 ldx  #$0C70                   ; Other routine used [$c6f]
@@ -1826,10 +1827,10 @@ F6C8: 7E F1 DB jmp  $F1DB                    ; (See routine at $f6cb)
 ;
 ; There are four creepers simulated by the PS4, all of which seem redundant (the
 ; main CPU hasn't been seen trying to read their results). This one, however, is
-; at least fed something by the CPU: the current level's wind speed. You'd think
-; the output would then be used to determine how many iterations of the bubble-
-; drifting simulation to run for that frame. But no. The main CPU doesn't even
-; try read it.
+; at least fed something by the main CPU: the current level's wind speed. You'd
+; think the output would then be used to determine how many iterations of the
+; bubble-drifting simulation to run for that frame. But no. The main CPU doesn't
+; even try read it.
 ;
 
 F6CB: CE 0C 76 ldx  #$0C76                   ; Fetch table source from [$c76]
@@ -3101,8 +3102,8 @@ FEBA: 0A       .byte $0A
 ;
 FEBB: 8E 00 FF lds  #$00FF                   ; Set stack pointer
 FEBE: 0F       sei                           ; Disable interrupts
-FEBF: 86 AF    lda  #$AF
-FEC1: 97 0F    sta  $0F                      ; Port 3 control and status register
+FEBF: 86 AF    lda  #$AF                     ; Store $af (enable latch, disable interrupts)..
+FEC1: 97 0F    sta  $0F                      ; ..into port 3 control and status register
 
 ; Initialize timers and serial port
 ;
@@ -3176,8 +3177,8 @@ FF15: 97 01    sta  $01                      ; ..port 2 data direction register
 FF17: 97 04    sta  $04                      ; ..port 3 data direction register
 FF19: 97 05    sta  $05                      ; ..port 4 data direction register
 
-FF1B: 86 BF    lda  #$BF                     ; Write $bf to..
-FF1D: 97 0F    sta  $0F                      ; ..port 3 control and status register
+FF1B: 86 BF    lda  #$BF                     ; Store $bf (enable latch, disable interrupts)..
+FF1D: 97 0F    sta  $0F                      ; ..into port 3 control and status register
 
 ; Communicate to test rig that we're starting the tests
 ;
@@ -3210,7 +3211,6 @@ FF3D: 7E F0 03 jmp  $F003                    ; Resume boot sequence at $f003
 
 ; FACTORY_TEST continues...
 ;
-
 ; RAM test
 ;
 FF40: 86 00    lda  #$00                     ; Pattern rotation offset = 0
@@ -3348,9 +3348,9 @@ FFEE: 36 20    .byte $36,$20
 
 FFF0: 00 00    .word $0000                   ; SCI interrupt
 FFF2: 00 00    .word $0000                   ; Timer overflow interrupt vector
-FFF4: F0 92    .word $F092                   ; Output compare interrupt vector
+FFF4: F0 92    .word $F092                   ; Output compare interrupt vector (PROCESS_PHONY_CREDITS)
 FFF6: 00 00    .word $0000                   ; Input capture interrupt vector
 FFF8: F0 46    .word $F046                   ; IRQ interrupt vector (IRQ_HANDLER)
 FFFA: 00 00    .word $0000                   ; Software interrupt vector
 FFFC: 00 00    .word $0000                   ; NMI interrupt vector (not wired)
-FFFE: F0 00    .word $F000                   ; Reset vector
+FFFE: F0 00    .word $F000                   ; Reset vector (RESET)

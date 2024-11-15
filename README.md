@@ -1,6 +1,12 @@
 # bubbleBobblePs4Disasm
 
 This repository contains an annotated disassembly of the microcontroller code
-for the ‘PS4’ security chip from the 1986 arcade game Bubble Bobble.
+of the ‘PS4’ security chip from the 1986 arcade game Bubble Bobble.
 
-It is offered for educational purposes.
+
+#### ps4_1986-06-29.s
+The annotated disassembly file
+
+#### trapscript
+
+A MAME debugger script for spotting incorrect conclusions in the disassembly

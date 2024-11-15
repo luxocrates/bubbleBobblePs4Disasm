@@ -1,0 +1,50 @@
+printf "This is a set of commands for the MAME debugger to identify if any"
+printf "of the conclusions reached in the disassembly interpretation are wrong."
+printf ""
+printf "Run this script by launching MAME with the -debug option, then typing"
+printf "`source trapscript`"
+printf ""
+printf "Alternatively, use the CLI options `-debug -debugscript trapscript`"
+printf ""
+printf "Then start the game"
+printf ""
+
+
+printf "Advancing past the RAM test"
+printf "Game will hit a breakpoint and may stop."
+printf "Press return to continue if that happens."
+g 0118
+
+printf "Trapping controllers outputs"
+wpset fc24,3,rw
+
+printf "Trapping controllers inputs"
+wpset fc6f,2,rw
+wpset fc7e,1,rw
+
+printf "Trapping creepers"
+wpset fc72,4,rw
+wpset fc77,1,rw
+wpset fc80,2,rw
+
+printf "Trapping mischief"
+wpset fc71,1,rw
+
+printf "Trapping time bomb"
+wpset fc7f,1,rw
+
+printf "Trapping translators"
+wpset ff88,#12,rw
+
+printf "Trapping possible debugging controls"
+wpset ff95,3,rw
+
+printf "Trapping abandoned credit event"
+wpset ff99,1,rw
+
+printf "Starting game"
+printf ""
+printf "If it should return you to the debugger during gameplay, please do let"
+printf "me know! (https://github.com/luxocrates)"
+printf ""
+g
