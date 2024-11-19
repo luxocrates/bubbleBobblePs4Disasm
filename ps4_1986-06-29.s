@@ -4,9 +4,9 @@
 ; The latest version of this document can be found at:
 ;     https://github.com/luxocrates/bubbleBobblePs4Disasm
 ;
-; The PS4 (labeled JPH1011P, but referred to throughout official sources as PS4)
-; is a 6801U4 microcontroller which serves as a security device for the 1986
-; Taito arcade game Bubble Bobble, without which the game is unplayable.
+; The PS4 (also labeled JPH1011P, but referred to throughout official sources as
+; PS4) is a 6801U4 microcontroller which serves as a security device for the
+; 1986 Taito arcade game Bubble Bobble. Without it, the game will not boot.
 ;
 ; This document is a disassembly of its mask ROM, annotated with an
 ; interpretation of its routines. The binary file it's based on was
@@ -16,7 +16,7 @@
 ;   - interfacing with player controls, DIP switches, coin mechanisms and the
 ;     cabinet's 'service' switch
 ;   - informing the beasties of where the players are
-;   - rotating which EXTEND bubbles the players are presented
+;   - rotating which EXTEND bubbles are presented to the players
 ;   - effecting functionality for the clock special item
 ;   - generating interrupts on the main CPU
 ;
@@ -62,8 +62,9 @@
 ;         bit 3:    COIN B input
 ;         bit 4:    OUT output
 ;         bit 5:    1/2 WAY output
-;         bit 6:    Raise main CPU interrupt
-;         bit 7:    Goes to IC12 PAL as P-CPU bus access type (0 = write, 1 = read)
+;         bit 6:    Raise interrupt on main CPU
+;         bit 7:    Goes to IC12 PAL as P-CPU bus access type
+;                   (0 = write, 1 = read)
 ; Port 2: bits 0-4: P-CPU address bus, bits 8-11
 ;         bit 5:    Signals to IC12 PAL that PS4 is requesting shared RAM access
 ; Port 3: bits 0-7: P-CPU data bus, bits 0-7
@@ -73,9 +74,9 @@
 ; P-CPU bus memory layout
 ; =======================
 ;
-; The P-CPU data/address buses connect the PS4 to shared RAM at IC16, and to some
-; I/O inputs. As a convention in this document, P-CPU addresses will be denoted
-; as, eg. [$c00]. The mapping is:
+; The P-CPU data/address buses connect the PS4 to shared RAM at IC16, and to
+; some I/O inputs. As a convention in this document, P-CPU addresses will be
+; denoted as, eg. [$c00]. The mapping is:
 ;
 ;   P-CPU addr      Main CPU addr   Device
 ;   -----------------------------------------------------
@@ -85,8 +86,8 @@
 ; For the memory layout below:
 ;
 ;   - 'r'/'w'/'rw' are from the perspective of the PS4 and represent how the
-;     code tries to access the addresses, even if that'll never happen in the
-;     actual game.
+;     code tries to access the addresses, even if they wouldn't get used in real
+;     gameplay.
 ;   - 'Seems unused' means that although the address is used by a routine,
 ;     the game doesn't seem to be making use of it. Likely the functionality was
 ;     abandoned.
@@ -124,12 +125,12 @@
 ; [$c15]-[$c18] - Beastie 6 equivalents of [$c01]-[$c04]
 ; [$c19]-[$c1c] - Beastie 7 equivalents of [$c01]-[$c04]
 ;
-; ------------------------------------------------------------------------------
+; -- Coin processor (abandoned) ------------------------------------------------
 ;
-; [$c1e](rw) - Phony credits count (seems unused)
+; [$c1e](rw) - Phony credits count (abandoned)
 ;
 ; It seems likely that this value was intended to be the authoritative credits
-; count, but was abandoned.
+; count, but was abandoned. Mostly.
 ;
 ; The main CPU tracks the credits count itself (not in shared RAM), but after
 ; incrementing it following a coin insertion, it does update this value. It's
@@ -144,11 +145,11 @@
 ; [$c22](w)  - Relay of [$002]
 ; [$c23](w)  - Relay of [$003]
 ;
-; -- Controller outputs --------------------------------------------------------
+; -- Controller outputs (abandoned) --------------------------------------------
 ;
-; [$c24](rw) - Phony credits count 1 (seems unused)
-; [$c25](rw) - Phony credits count 2 (seems unused)
-; [$c26](rw) - Phony level (seems unused)
+; [$c24](rw) - Phony credits count 1 (abandoned)
+; [$c25](rw) - Phony credits count 2 (abandoned)
+; [$c26](rw) - Phony level (abandoned)
 ;
 ; -- Beastie output structure --------------------------------------------------
 ;
@@ -178,38 +179,38 @@
 ;
 ; [$c5f](r)  - Player 1 phony liveness (bit 0)
 ;              Most likely intended as a way for the main CPU to tell the PS4
-;              that player 1 is alive, but effectively unused. Gets set to $01
+;              that player 1 is alive, but mostly abandoned. Gets set to $01
 ;              at start of gameplay, and the PS4 won't do processing for
 ;              beasties unless it is $01, but nothing ever seems to reset it to
 ;              zero.
 ; [$c60](r)  - Player 1 Y position
 ; [$c61](r)  - Player 1 X position
-; [$c62](w)  - Player 1 kill switch (seems unused)
+; [$c62](w)  - Player 1 kill switch (abandoned)
 ;              Most likely intended as a way for the PS4 to tell the main CPU to
 ;              kill off player 1, but the collision detection code was botched,
 ;              so the main CPU disregards this value. Likely, this is why [$c5f]
-;              isn't really used.
+;              is mostly abandoned.
 ; [$c63](w) -  Index of beastie that the bugged collision detector thinks
-;              collided with the player
+;              collided with the player (abandoned)
 ;
 ; [$c67]-[$c6b] - Player 2 equivalents of [$c5f]-[$c63]
 ;
-; -- Controller inputs ---------------------------------------------------------
+; -- Controller inputs (abandoned) ---------------------------------------------
 ;
-; [$c6f](rw) - Command for phony credits controller 1 (seems unused)
-; [$c70](rw) - Command for phony credits controller 2 (seems unused)
-; [$c7e](r)  - Command for phony level controller (seems unused)
+; [$c6f](rw) - Command for phony credits controller 1 (abandoned)
+; [$c70](rw) - Command for phony credits controller 2 (abandoned)
+; [$c7e](r)  - Command for phony level controller (abandoned)
 ;
-; -- Creepers (see PROCESS_CREEPER_C76) ----------------------------------------
+; -- Creepers (abandoned) (see PROCESS_CREEPER_C76) ----------------------------
 ;
-; [$c72](r)  - Seems unused (input to creeper for [$c73])
-; [$c73](w)  - Seems unused (output from creeper for [$c72])
-; [$c74](r)  - Seems unused (input to creeper for [$c75])
-; [$c75](w)  - Seems unused (output from creeper for [$c74])
-; [$c76](r)  - Wind speed   (input to creeper for [$c77])
-; [$c77](w)  - Seems unused (output from creeper for [$c76])
-; [$c80](r)  - Seems unused (input to creeper for [$c81])
-; [$c81](w)  - Seems unused (output from creeper for [$c80])
+; [$c72](r)  - Spare       (input to creeper for [$c73])
+; [$c73](w)  - Spare       (output from creeper for [$c72])
+; [$c74](r)  - Spare       (input to creeper for [$c75])
+; [$c75](w)  - Spare       (output from creeper for [$c74])
+; [$c76](r)  - Wind speed  (input to creeper for [$c77])
+; [$c77](w)  - Abandoned   (output from creeper for [$c76])
+; [$c80](r)  - Spare       (input to creeper for [$c81])
+; [$c81](w)  - Spare       (output from creeper for [$c80])
 ;
 ; -- Clock special item --------------------------------------------------------
 ;
@@ -219,7 +220,7 @@
 ; [$c7b](w)  - Clock countdown complete, if PS4 writes $01
 ;
 ; ------------------------------------------------------------------------------
-; [$c71]     - enables PROCESS_CREDITS_MISCHIEF, if $0d (seems unused)
+; [$c71]     - enables PROCESS_CREDITS_MISCHIEF, if $0d (abandoned)
 ; [$c7c](rw) - Which EXTEND bubble the player would be offered if one appeared
 ;              right now
 ; [$c7d](w)  - I/O error reporting. PS4 writes $01 on error.
@@ -228,25 +229,25 @@
 ; [$c83](w)  - PS4 checksum low byte  (game will report error if nonzero)
 ; [$c85](w)  - PS4 ready reporting. Main CPU waits for PS4 to write $37 here.
 ;
-; -- Translators (see PROCESS_TRANSLATOR_F88) ----------------------------------
+; -- Translators (abandoned) (see PROCESS_TRANSLATOR_F88) ----------------------
 ;
 ; In theory, translators could target any other addresses in the range
 ; [$c88]-[$f87], but in practice they're unused.
 ;
-; [$f88](rw) - status            for translator at $f903 (seems unused)
-; [$f89](r)  - index ptr         for translator at $f903 (seems unused)
-; [$f8a](r)  - table ptr         for translator at $f903 (seems unused)
-; [$f8b](r)  - output offset ptr for translator at $f903 (seems unused)
+; [$f88](rw) - status            for translator at $f903 (spare/abandoned)
+; [$f89](r)  - index ptr         for translator at $f903 (spare/abandoned)
+; [$f8a](r)  - table ptr         for translator at $f903 (spare/abandoned)
+; [$f8b](r)  - output offset ptr for translator at $f903 (spare/abandoned)
 ;
-; [$f8c](rw) - status            for translator at $f93d (seems unused)
-; [$f8d](r)  - index ptr         for translator at $f93d (seems unused)
-; [$f8e](r)  - table ptr         for translator at $f93d (seems unused)
-; [$f8f](r)  - output offset ptr for translator at $f93d (seems unused)
+; [$f8c](rw) - status            for translator at $f93d (spare/abandoned)
+; [$f8d](r)  - index ptr         for translator at $f93d (spare/abandoned)
+; [$f8e](r)  - table ptr         for translator at $f93d (spare/abandoned)
+; [$f8f](r)  - output offset ptr for translator at $f93d (spare/abandoned)
 ;
-; [$f90](rw) - status            for translator at $f977 (seems unused)
-; [$f91](r)  - index ptr         for translator at $f977 (seems unused)
-; [$f92](r)  - table ptr         for translator at $f977 (seems unused)
-; [$f93](r)  - output offset ptr for translator at $f977 (seems unused)
+; [$f90](rw) - status            for translator at $f977 (spare/abandoned)
+; [$f91](r)  - index ptr         for translator at $f977 (spare/abandoned)
+; [$f92](r)  - table ptr         for translator at $f977 (spare/abandoned)
+; [$f93](r)  - output offset ptr for translator at $f977 (spare/abandoned)
 ;
 ; ------------------------------------------------------------------------------
 ;
@@ -254,13 +255,13 @@
 ;                $01 - stop accepting
 ;                $ff - start accepting
 ;                otherwise, do not change
-; [$f95](r)  - Seems unused; possibly a debugging cache coherency check, if $42
+; [$f95](r)  - Seems abandoned; maybe a debugging cache coherency check, if $42
 ;              (see PROCESS_CREDITS_CONTROLLER_1, PROCESS_CREDITS_CONTROLLER_2,
 ;              PROCESS_LEVEL_CONTROLLER)
-; [$f96](r)  - Delay after interrupt handler, if $47
-; [$f97](r)  - Reboot PS4, if $4a
+; [$f96](r)  - Delay after interrupt handler, if $47 (seems unused)
+; [$f97](r)  - Reboot PS4, if $4a (seems unused)
 ; [$f98](r)  - Main CPU is ready, if $47
-; [$f99](w)  - Phony credit event
+; [$f99](w)  - Phony credit event (abandoned)
 ;              PS4 writes $01 here on credit bumps, but main CPU doesn't read it
 ;
 ;
@@ -311,7 +312,7 @@
 ;               (An unactioned coin is where the game pricing would be, say,
 ;               2-coins-1-credit: this is the counter we bump after receiving
 ;               the first coin.)
-; $004a-$004b:  Scratch (last P-CPU bus address read from or written to)
+; $004a-$004b:  Cache of last P-CPU bus address read from or written to
 ; 0004c:        Time bomb: previous value of [$c7f]
 ; $004d:        Time bomb: number of frames with a constant [$c7f]
 ; $004e:        Cached controls/DIPs byte 0
@@ -386,7 +387,7 @@ F020: 7F 00 11 clr  $0011                    ; Clear transmit/receive control an
 ;
 F023: CE 00 40 ldx  #$0040                   ; Point X to RAM base (device registers come before)
 F026: C6 C0    ldb  #$C0                     ; Loop counter: 192
-F028: 6F 00    clr  $00,x                    ; Empty byte
+F028: 6F 00    clr  $00,x                    ; Clear the byte at pointer
 F02A: 08       inx                           ; Increment pointer
 F02B: 5A       decb                          ; Decrement loop counter
 F02C: 26 FA    bne  $F028                    ; Loop
@@ -417,6 +418,7 @@ F045: 01       nop
 
 ;
 ; IRQ_HANDLER:
+; (Pointed to from reset vector at $fffe-f)
 ;
 ; The entrypoint for per-frame processing of basically everything the PS4 does
 ;
@@ -441,7 +443,7 @@ F076: BD F9 3D jsr  $F93D                    ; Call PROCESS_TRANSLATOR_F8C
 F079: BD F9 77 jsr  $F977                    ; Call PROCESS_TRANSLATOR_F90
 F07C: BD F2 99 jsr  $F299                    ; Call PROCESS_RESET_REQUEST
 
-                                             ; Conspicuously don't call PROCESS_TIME_BOMB
+                                             ; (And don't call PROCESS_TIME_BOMB)
 
 F07F: CE 0F 96 ldx  #$0F96                   ; Read [$f96]
 F082: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
@@ -462,14 +464,14 @@ F091: 3B       rti                           ; Done: return to IDLE
 ; DIP switches, manages the coin lockouts to prevent excessive credits, and
 ; sends events to the main CPU when the count changes. The one thing it doesn't
 ; do is decrement the count when a game starts -- presumably they're expecting
-; the main CPU to do that, but that introduces a critical section issue that
-; could cause an incoming coin to not register.
+; the main CPU to do that, but that would introduce a critical section issue
+; that could cause an incoming coin to not register.
 ;
-; Kicker: all of this code is completely inconsequential. The main CPU manages
-; its own credits count, using only the coin information relayed by RELAY_PORTS.
-; Although it does drive the coin lockouts, the PROCESS_COIN_LOCKOUTS routine
-; gets called right after, which overwrites the state of the lockouts using
-; requests from the main CPU.
+; Kicker: they abandoned this code. The main CPU manages a credits count of its
+; own, using only the coin information relayed by RELAY_PORTS. Although it does
+; drive the coin lockouts, the PROCESS_COIN_LOCKOUTS routine gets called right
+; after, which overwrites the state of the lockouts using requests from main
+; CPU (which can cause a nasty conflict. Read on...).
 ;
 
 ; Check that the main CPU is ready for us (see also INTERRUPT_MAIN_CPU)
@@ -631,10 +633,9 @@ F15F: 24 07    bcc  $F168                    ; If not, do DISABLE_COIN_LOCKOUTS 
 
 ;
 ; ENABLE_COIN_LOCKOUTS:
-; (Called from both PROCESS_PHONY_CREDITS and PROCESS_COIN_LOCKOUTS, which
-; overrides the PS4-calculated value with one from the main CPU)
+; (Called from PROCESS_PHONY_CREDITS and PROCESS_COIN_LOCKOUTS)
 ;
-; Configures the coin mechs to not accept more coins
+; Configures the coin mechs to reject more coins
 ;
 
 F161: 86 EF    lda  #$EF                     ; Create a mask for bit 4 ('OUT' for port 1)
@@ -645,8 +646,7 @@ F167: 39       rts
 
 ;
 ; DISABLE_COIN_LOCKOUTS:
-; (Called from both PROCESS_PHONY_CREDITS and PROCESS_COIN_LOCKOUTS, which
-; overrides the PS4-calculated value with one from the main CPU)
+; (Called from PROCESS_PHONY_CREDITS and PROCESS_COIN_LOCKOUTS)
 ;
 ; Configures the coin mechs to accept more coins
 ;
@@ -659,7 +659,7 @@ F16E: 39       rts
 
 ;
 ; TRACK_MSB_CHANGE:
-; (A subroutine for PROCESS_PHONY_CREDITS)
+; (Called from PROCESS_PHONY_CREDITS)
 ;
 ; On entry, X   = a RAM address
 ;           A   = a byte where we only care about the MSB
@@ -680,11 +680,13 @@ F174: A7 00    sta  $00,x                    ; Store this frame's byte into X
 F176: 4F       clra                          ; Stage a change code of $00
 
 ; Set change code bit 0 based on last frame's MSB
+;
 F177: 58       aslb                          ; Rotate prev frame's byte left
 F178: 25 01    bcs  $F17B                    ; If its bit 7 was set, skip
 F17A: 4C       inca                          ; Effectively, sets bit 0
 
 ; Set change code bit 1 based on this frame's MSB
+;
 F17B: 78 00 46 asl  $0046                    ; Shift this frame's byte left
 F17E: 24 02    bcc  $F182                    ; If its bit 7 was unset, skip
 F180: 4C       inca                          ; Effectively, sets..
@@ -726,6 +728,7 @@ F195: 39       rts
 
 ;
 ; TEST_FOR_STUCK_COINS:
+; (Called from RESET)
 ;
 
 F196: 8D D0    bsr  $F168                    ; Call DISABLE_COIN_LOCKOUTS
@@ -736,7 +739,7 @@ F1A0: 96 02    lda  $02                      ; Read port 1 (cabinet) data
 F1A2: 84 0C    anda #$0C                     ; Isolate bits 2 and 3 (COIN A, COIN B)
 F1A4: 26 01    bne  $F1A7                    ; If nonzero, a coin is in: report failure
 F1A6: 39       rts  
-;
+
 ; Either or both of the coin mechs were reporting that a coin was in at the time
 ; of boot. Write a $01 to [$c7d]. Game will now report "I/O ERROR" and boot loop
 ; until the coin mechs no longer report there's a coin in.
@@ -762,7 +765,9 @@ F1AF: 39       rts
 ; engage the lockouts because it thinks there are still nine credits; the main
 ; CPU's credit counter will then disengage them because the actual number is
 ; eight. In this scenario, the lockouts would get pulsed at 60Hz (albeit with
-; a short 'on' window). That can't be good for them! Or the drivers.
+; a short 'on' window) until such a time as a new coin is inserted that brings
+; the credits count to something below 9. That can't be good for them! Or the
+; drivers.
 ;
 
 F1B0: CE 0F 94 ldx  #$0F94                   ; [$f94] is coin lockout instruction
@@ -782,16 +787,16 @@ F1BE: 39       rts
 ; This is the sole function through which all shared RAM reads flow, as well as
 ; the input controls and DIP switches.
 ;
-; Note similarities to P_CPU_BUS_WRITE.
+; (See also P_CPU_BUS_WRITE)
 ;
 
-; Set port 1 bit 7 high. This signals to the IC12 PAL that we'll be doing a read.
-F1BF: 96 02    lda  $02
-F1C1: 8A 80    ora  #$80
-F1C3: 97 02    sta  $02
+; Signal to the IC12 PAL that we'll be doing a read
+;
+F1BF: 96 02    lda  $02                      ; Read port 1 data
+F1C1: 8A 80    ora  #$80                     ; Set bit 7 high (pin 19)
+F1C3: 97 02    sta  $02                      ; Write back to port 1 data
 
-; Set port 3 (data bus) data direction register to be reading from it
-F1C5: 7F 00 04 clr  $0004
+F1C5: 7F 00 04 clr  $0004                    ; Port 3 data direction register = all bits incoming
 
 ; Put out the address with /SORAM low. Then set /SORAM high to kick off the request.
 ;
@@ -803,9 +808,16 @@ F1D2: 97 03    sta  $03                      ; Put address high byte on port 2 (
 F1D4: 8A 10    ora  #$10                     ; Set /SORAM output bit (tells IC12 PAL of a request)
 F1D6: 97 03    sta  $03                      ; Add that to port 2
 
-; I'm guessing they've done some configuration of the ports to hold off read
-; attempts on port 3 data until the SC1 input is confident that the request has
-; been fulfilled, but I don't know where.
+; At $f013, port 3 was set up to use a latch. That means that a falling edge of
+; the SC1 pin (as IS3), sent from the IC12 PAL (the P-CPU bus arbiter) will
+; latch the value on the P-CPU data bus for the port 3 data register.
+;
+; There's now a race condition. What should happen is that the port 3 control
+; and status register should be read to confirm that that a new value has been
+; latched, after which it's safe to read the port 3 data register to get that
+; value. This code doesn't do that; it just assumes that the data will have come
+; in by the very next instruction (and in practice it seems they get away with
+; it).
 ;
 F1D8: D6 06    ldb  $06                      ; Read port 3 (data bus) data
 F1DA: 39       rts  
@@ -817,19 +829,19 @@ F1DA: 39       rts
 ; Writes a byte (in reg B) to the P-CPU bus (at address X)
 ;
 ; This is the sole function through which all shared RAM writes flow.
-; Note similarities to P_CPU_BUS_READ.
+;
+; (See also P_CPU_BUS_READ)
 ;
 
-; Clear port 1 bit 7. This signals to the IC12 PAL that we'll be doing a write.
-F1DB: 96 02    lda  $02
-F1DD: 84 7F    anda #$7F
-F1DF: 97 02    sta  $02
+; Signal to the IC12 PAL that we'll be doing a write
+;
+F1DB: 96 02    lda  $02                      ; Read port 1 data
+F1DD: 84 7F    anda #$7F                     ; Set bit 7 low (pin 19)
+F1DF: 97 02    sta  $02                      ; Write back to port 1 data
 
-; Set port 3 (data bus) data direction register to be writing to it
-F1E1: 86 FF    lda  #$FF
-F1E3: 97 04    sta  $04
-
-F1E5: D7 06    stb  $06                      ; Put byte to write on the data bus
+F1E1: 86 FF    lda  #$FF                     ; Set 'all bits outgoing' to..
+F1E3: 97 04    sta  $04                      ; ..port 3 data direction register
+F1E5: D7 06    stb  $06                      ; Put byte to write on the data bus (port 3)
 F1E7: FF 00 4A stx  $004A                    ; Stash shared RAM address in $004a/b
 F1EA: FC 00 4A ldd  $004A                    ; ..maybe just to move X to A and B?
 F1ED: 84 0F    anda #$0F                     ; Mask out upper nibble of address
@@ -857,7 +869,7 @@ F1FB: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F1FE: C1 47    cmpb #$47                     ; Is it the magic number?
 F200: 27 01    beq  $F203                    ; Proceed with the interrupt
 F202: 39       rts                           ; Otherwise, we're done
-;
+
 ; Port 1 bit 6 clocks a flip-flop (IC30) which feeds the main CPU's INT line.
 ; We'll set it low, then high, then low again, to guarantee a full clock pulse.
 ;
@@ -919,28 +931,38 @@ F235: 39       rts
 ; main CPU can read them.
 ;
 
+; Copy Port 1 to [$c1f]
+;
 F236: D6 02    ldb  $02                      ; Read PS4 port 1 data
 F238: CE 0C 1F ldx  #$0C1F                   ; Relay it to [$c1f]
 F23B: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 
+; Copy [$000] to [$c20]
+;
 F23E: CE 00 00 ldx  #$0000                   ; Read player controls/DIPs 0
 F241: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F244: F7 00 4E stb  $004E                    ; Cache it in $004e
 F247: CE 0C 20 ldx  #$0C20                   ; Relay it to [$c20]
 F24A: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 
+; Copy [$001] to [$c21]
+;
 F24D: CE 00 01 ldx  #$0001                   ; Read player controls/DIPs 1
 F250: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F253: F7 00 4F stb  $004F                    ; Cache it in $004f
 F256: CE 0C 21 ldx  #$0C21                   ; Relay it to [$c21]
 F259: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 
+; Copy [$002] to [$c22]
+;
 F25C: CE 00 02 ldx  #$0002                   ; Read player controls/DIPs 2
 F25F: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F262: F7 00 50 stb  $0050                    ; Cache it in $0050
 F265: CE 0C 22 ldx  #$0C22                   ; Relay it to [$c22]
 F268: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 
+; Copy [$003] to [$c23]
+;
 F26B: CE 00 03 ldx  #$0003                   ; Read player controls/DIPs 3
 F26E: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F271: F7 00 51 stb  $0051                    ; Cache it in $0051
@@ -950,6 +972,7 @@ F277: 7E F1 DB jmp  $F1DB                    ; Call P_CPU_BUS_WRITE and return
 
 ;
 ; CHECKSUM:
+; (Called from RESET)
 ;
 ; Calculates a 16-bit checksum of code ROM, for the main CPU to use in a self-
 ; test. The game code expects the value reported here to be $0000; if it isn't,
@@ -973,6 +996,7 @@ F28F: 33       pulb                          ; Retrieve stashed A
 F290: CE 0C 82 ldx  #$0C82                   ; Store it in [$c82]
 F293: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F296: 39       rts  
+
 ;
 ; Given that the checksum is a 2-byte value, and that there are exactly 2 bytes
 ; between CHECKSUM and the following routine, neither of which get jumped to, I
@@ -988,8 +1012,8 @@ F297: 08 38    .byte $08,$38
 ;
 ; Begins a warm boot of the PS4 if [$f97] == $4a
 ;
-; It's not obvious why this would be needed: the PS4's reset line is memory-mapped
-; to the main CPU.
+; It's not obvious why this would be needed: the PS4's reset line is
+; memory-mapped to the main CPU.
 ;
 
 F299: CE 0F 97 ldx  #$0F97                   ; Read [$f97]
@@ -1048,18 +1072,18 @@ F2A6: 39       rts
 ;    the finished game is 9 (maybe they just changed their minds about that).
 ;    They're presumably relying on the coin lockouts to prevent the requests
 ;    past 10 from coming in, and the main purpose of forcing a clamp is for
-;    use of the service switch.
+;    use of the service button.
 ;
 ; 4. When the pricing for the game is one-coin-two-credits or two-coins-three-
 ;    credits, the main CPU would need to queue requests to this API to feed the
-;    credit bumps in one at a time.
+;    credit bumps one at a time.
 ;
 ; All of that would make me wonder if this really is a credits count controller,
 ; but given that it's pulling the same DIP switch values that
 ; PROCESS_PHONY_CREDITS is using for a pricing table, I'm fairly confident.
 ; Perhaps these problems are why Taito mothballed it?
 ;
-; Just for the record, a complete playthrough of the game showed that the game
+; Just for the record, a complete playthrough of `bublbobl` showed that the game
 ; never attempted to write to the request channel.
 ;
 
@@ -1083,12 +1107,11 @@ F2C3: C1 42    cmpb #$42
 F2C5: 26 0C    bne  $F2D3                    ; rts
 
 ; [$f95] was $42. Read [$c24]. If it doesn't match the contents of $0052 (which
-; was trying to cache what [$c24] was being set to), push the A register onto
-; the stack and then try rts -- which would crash because the top of the stack
-; just had that register value pushed to it. I'm guessing that was intentional,
-; either so a debugger could kick in during development (though the value pushed
-; on the stack wouldn't be instructive), or to frustrate efforts to reverse-
-; engineer the PS4. In either case, why the [$f95] == $42 check?
+; caches what we last set [$c24] to), push the A register onto the stack and
+; then try rts -- which would crash because the top of the stack just had that
+; register value pushed to it. PROCESS_TIME_BOMB does the same thing, so I'm
+; presuming this is an intentional ploy to frustrate efforts to reverse-engineer
+; the PS4, but I'm struggling to see how.
 ;
 F2C7: CE 0C 24 ldx  #$0C24
 F2CA: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
@@ -1191,9 +1214,9 @@ F346: 02       .byte $02
 ;   - [$c25] instead of [$c24]
 ;   - $0053  instead of $0052
 ;
-; See the PROCESS_CREDITS_CONTROLLER_1 comments for explanation.
+; See the PROCESS_CREDITS_CONTROLLER_1 comments for explanation
 ;
-; The main CPU wasn't seen activating this one during a playthrough either.
+; The main CPU wasn't seen activating this one during a playthrough either
 ;
 
 F347: CE 0C 70 ldx  #$0C70                   ; Other routine used [$c6f]
@@ -1323,7 +1346,8 @@ F403: 27 7E    beq  $F483                    ;       ..go to $f483
 ; Reached only if [$c7e] was $00, $80, or not a power of two:
 ;
 ; If [$f95] isn't $42, do no more
-; otherwise, read [$c26]. If it doesn't match $0054, trash the stack (why?!)
+; otherwise, read [$c26]. If it doesn't match $0054, trash the stack (parallel
+; to $f2bd-$f2d3).
 ;
 F405: CE 0F 95 ldx  #$0F95
 F408: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
@@ -1337,6 +1361,7 @@ F41A: 36       psha                          ; Puts a stray byte on the stack be
 F41B: 39       rts  
 
 ; [$c7e] was $01: clear what's at [$c26], $0054 and [$c7e]
+;
 F41C: CE 0C 26 ldx  #$0C26
 F41F: C6 00    ldb  #$00
 F421: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
@@ -1347,6 +1372,7 @@ F42C: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F42F: 39       rts  
 
 ; [$c7e] was $02: increment what's at [$c26], caching new value at $0054; clear [$c7e]
+;
 F430: CE 0C 26 ldx  #$0C26
 F433: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F436: 5C       incb 
@@ -1359,6 +1385,7 @@ F445: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F448: 39       rts  
 
 ; [$c7e] was $04: write $31 to [$c26] and $0054, and $00 to [$c7e]
+;
 F449: CE 0C 26 ldx  #$0C26
 F44C: C6 31    ldb  #$31
 F44E: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
@@ -1366,6 +1393,7 @@ F451: C6 31    ldb  #$31
 ; Falls through...
 
 ; Common ending for this handler and the few that follow
+;
 F453: F7 00 54 stb  $0054                    ; Cache the value we just wrote to shared RAM
 F456: CE 0C 7E ldx  #$0C7E                   ; To [$c7e], write..
 F459: C6 00    ldb  #$00                     ; ..zero
@@ -1373,6 +1401,7 @@ F45B: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F45E: 39       rts                           ; Done
 
 ; [$c7e] was $08: write $62 to [$c26] and $0054, and $00 to [$c7e]
+;
 F45F: CE 0C 26 ldx  #$0C26
 F462: C6 62    ldb  #$62
 F464: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
@@ -1380,6 +1409,7 @@ F467: C6 62    ldb  #$62
 F469: 20 E8    bra  $F453                    ; Common ending
 
 ; [$c7e] was $10: write $63 to [$c26] and $0054, and $00 to [$c7e]
+;
 F46B: CE 0C 26 ldx  #$0C26
 F46E: C6 63    ldb  #$63
 F470: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
@@ -1387,6 +1417,7 @@ F473: C6 63    ldb  #$63
 F475: 20 DC    bra  $F453                    ; Common ending
 
 ; [$c7e] was $20: write $64 to [$c26] and $0054, and $00 to [$c7e]
+;
 F477: CE 0C 26 ldx  #$0C26
 F47A: C6 64    ldb  #$64
 F47C: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
@@ -1394,6 +1425,7 @@ F47F: C6 64    ldb  #$64
 F481: 20 D0    bra  $F453                    ; Common ending
 
 ; [$c7e] was $40: write $65 to [$c26] and $0054, and $00 to [$c7e]
+;
 F483: CE 0C 26 ldx  #$0C26
 F486: C6 65    ldb  #$65
 F488: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
@@ -1405,19 +1437,30 @@ F48D: 20 C4    bra  $F453                    ; Common ending
 ; PROCESS_BEASTIES_FOR_P1:
 ; (Called from IRQ_HANDLER)
 ;
-; This is for player 1. Note that the code in $f585 onwards does player 2, and
-; is virtually identical.
+; Iterates through the 'beastie input structure' for each of the seven beasties,
+; at [$c01]-[$c1c], and fills out the corresponding 'beastie output structure'
+; at [$c27]-[$c5e], for player 1 only. We're calculating whether each beastie is
+; above or below player 1, and by how much, and whether they're to the left or
+; the right of player 1, and by how much. It makes an attempt to determine if
+; any beasties have collided with player 1, but gets it wrong, and is ignored
+; by the main game code. Ultimately, its impact is to help direct the beasties.
+; Remove this routine and you'll see them jumping a whole lot.
+;
+; (See also PROCESS_BEASTIES_FOR_P2)
 ;
 
 F48F: CE 0C 5F ldx  #$0C5F                   ; [$c5f] = player 1 liveness
 F492: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 
 ; Check phony liveness value of player 1 before starting (see note in memory map)
+;
 F495: C4 01    andb #$01
 F497: C1 01    cmpb #$01
 F499: 27 01    beq  $F49C                    ; Only start if [$c5f] has bit 0 set
 F49B: 39       rts  
 
+; Initialize loop variables
+;
 F49C: 7F 00 57 clr  $0057                    ; Reset count of beasties processed
 F49F: CE 0C 60 ldx  #$0C60                   ; Point X to the player's Y position
 F4A2: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
@@ -1432,6 +1475,7 @@ F4BA: FD 00 5A std  $005A                    ; ..in $005a/b
 F4BD: 7F 00 5C clr  $005C                    ; Reset count of Y overlaps
 
 ; Loop start for beastie iteration
+;
 F4C0: FE 00 58 ldx  $0058                    ; Load current beastie's life stage
 F4C3: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
 F4C6: C4 01    andb #$01                     ; Is bit 1 set? (ie. is it alive?)
@@ -1440,6 +1484,7 @@ F4CA: 27 03    beq  $F4CF                    ; If so, let's process it
 F4CC: 7E F5 3D jmp  $F53D                    ; If not, go to end of loop to iterate to next beastie
 
 ; Beastie is alive
+;
 F4CF: FE 00 58 ldx  $0058                    ; Load beastie input structure base into X
 F4D2: 08       inx                           ; Increment, so X now points to its coordinates
 
@@ -1454,23 +1499,28 @@ F4DA: 27 0B    beq  $F4E7                    ; If they match, branch to $f4e7
 F4DC: 24 05    bcc  $F4E3                    ; If player had higher (greater) Y pos, go to $f4e3
 
 ; Player is below beastie
+;
 F4DE: C6 01    ldb  #$01                     ; Output code will be $01
 F4E0: 40       nega                          ; Flip the sign: get the absolute Y delta
 F4E1: 20 06    bra  $F4E9                    ; Commit it and move on
 
 ; Player is above beastie
+;
 F4E3: C6 00    ldb  #$00                     ; Output code will be $00
 F4E5: 20 02    bra  $F4E9                    ; Commit it and move on
 
 ; Player has the same Y pos as beastie
+;
 F4E7: C6 80    ldb  #$80                     ; Output code will be $80
 
 ; Write output code to byte 0 of beastie output structure
+;
 F4E9: FE 00 5A ldx  $005A                    ; Point X to beastie output structure base
 F4EC: 36       psha                          ; Stash absolute Y delta on the stack
 F4ED: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 
 ; Store the absolute Y delta into the fifth byte of the output structure
+;
 F4F0: FE 00 5A ldx  $005A
 F4F3: 08       inx  
 F4F4: 08       inx  
@@ -1481,9 +1531,11 @@ F4F8: 36       psha
 F4F9: 16       tab  
 F4FA: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 
+; Determine if a Y-collision has occurred
+;
 F4FD: 32       pula                          ; Retrieve stashed absolute Y delta
-F4FE: 81 08    cmpa #$08
-F500: 24 03    bcc  $F505
+F4FE: 81 08    cmpa #$08                     ; Was the delta within 8?
+F500: 24 03    bcc  $F505                    ; If not, skip an instruction
 
 ; A Y collision has happened
 ;
@@ -1502,18 +1554,22 @@ F511: 27 0B    beq  $F51E                    ; If they match, branch to $f51e
 F513: 24 05    bcc  $F51A                    ; If player had rightmost (greater) X pos, go to $f51a
 
 ; Player is left of beastie
+;
 F515: C6 01    ldb  #$01                     ; Output code will be $01
 F517: 40       nega                          ; Flip the sign: get the absolute X delta
 F518: 20 06    bra  $F520                    ; Commit it and move on
 
 ; Player is right of beastie
+;
 F51A: C6 00    ldb  #$00                     ; Output code will be $00
 F51C: 20 02    bra  $F520                    ; Commit it and move on
 
 ; Player has the same X pos as beastie
+;
 F51E: C6 80    ldb  #$80                     ; Output code will be $80
 
 ; Write output code to the third byte of beastie output structure
+;
 F520: FE 00 5A ldx  $005A                    ; Point X to beastie output structure base..
 F523: 08       inx                           ; ..and add..
 F524: 08       inx                           ; ..two
@@ -1521,6 +1577,7 @@ F525: 36       psha                          ; Stash absolute X delta on the sta
 F526: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 
 ; Store the absolute X delta into the seventh byte of the output structure
+;
 F529: FE 00 5A ldx  $005A
 F52C: 08       inx  
 F52D: 08       inx  
@@ -1534,10 +1591,11 @@ F534: 16       tab
 F535: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 
 F538: 32       pula                          ; Retrieve stashed absolute X delta
-F539: 81 08    cmpa #$08
-F53B: 25 26    bcs  $F563
+F539: 81 08    cmpa #$08                     ; Was the delta within 8?
+F53B: 25 26    bcs  $F563                    ; If so, consider an X collision
 
 ; Loop post-amble
+;
 F53D: FE 00 58 ldx  $0058                    ; Point X to beastie input structure base
 F540: 08       inx                           ; Increment it by 4..
 F541: 08       inx                           ; ..
@@ -1560,15 +1618,16 @@ F555: 7C 00 57 inc  $0057                    ; Increment count of beasties we've
 F558: B6 00 57 lda  $0057                    ; ..and pull it into A
 F55B: 81 07    cmpa #$07                     ; Have we processed all seven?
 F55D: 27 03    beq  $F562                    ; If so, skip to return
-F55F: 7E F4 C0 jmp  $F4C0                    ; If not, loop
+F55F: 7E F4 C0 jmp  $F4C0                    ; If not, loop without resetting Y collision flag
+                                             ; (bug: should have branched to $f4bd)
 F562: 39       rts                           ; All done
 
-; An X collision has happened.
+; An X collision has happened
 ;
 ; The code from here on out has a showstopper bug. What the developer probably
 ; intended was to kill off the player if both axes of a beastie are +/-8 from
-; the player's corresponding axis. What's _actually_ happening is that we iterate
-; through the beasties, and...
+; the player's corresponding axis. What's _actually_ happening is that we
+; iterate through the beasties, and...
 ;
 ;  - each time there's a Y collision, we increment $005c
 ;  - each time there's an X collision, then:
@@ -1582,13 +1641,14 @@ F562: 39       rts                           ; All done
 ;  - none of the beasties that follow the one with the X overlap will have their
 ;    beastie output data updated
 ;
-; I'll speculate that the code that runs the axis-tests for a single beastie used
-; to get jsr'd to, with a zero $005c each time. But that's no longer the case,
-; and the post-X-overlap code thinks it's just returning from a single beastie
-; processor but it's accidentally rts'ing from the whole lot.
+; I'll speculate that the code that runs the axis-tests for a single beastie
+; used to get jsr'd to, with a zero $005c each time. But that's no longer the
+; case, and the post-X-overlap code thinks it's just returning from a single
+; beastie processor but it's accidentally rts'ing from the whole lot.
 ;
-; I'll further speculate that they only realized this problem after the mask ROMs
-; for the PS4s were in production, and worked around it in main CPU code by:
+; I'll further speculate that they only realized this problem after the mask
+; ROMs for the PS4s were in production, and worked around it in main CPU code
+; by:
 ;
 ;  - deprecating the [$c5f]/[$c67] variables that otherwise look like they're
 ;    trying to track whether players 1 and 2, respectively, are alive
@@ -1599,7 +1659,8 @@ F562: 39       rts                           ; All done
 ;    but... well, as a player, did you ever notice?
 ;
 F563: 7D 00 5C tst  $005C                    ; Was a Y collision previously reported?
-F566: 27 FA    beq  $F562                    ; If not, early-out
+F566: 27 FA    beq  $F562                    ; If not, quit beasties processing routine
+                                             ; (bug: should have branched to $f53d)
 
 ; The code thinks that a player and a beastie overlap in both X and Y and wants
 ; to kill the player off. It'll first re-load their liveness, I guess to not
@@ -1625,11 +1686,8 @@ F582: 7E F1 DB jmp  $F1DB                    ; Call P_CPU_BUS_WRITE and return
 ; PROCESS_BEASTIES_FOR_P2:
 ; (Called from IRQ_HANDLER)
 ;
-; This is for player 2. Note that the code in $f48f onwards does player 1,
-; and is virtually identical, the only differences being a few of the pointers
-; and some extra increments so data can be stored after the P1 data.
-;
-; So below I'm only commenting on the differences.
+; Mirrors PROCESS_BEASTIES_FOR_P1, but targets some different addresses for
+; player 2
 ;
 
 F585: CE 0C 67 ldx  #$0C67                   ; Was [$c5f] for P1
@@ -1763,7 +1821,7 @@ F67C: 7E F1 DB jmp  $F1DB                    ; (See routine at $f48f)
 ; PROCESS_CREEPER_C72_C74:
 ; (Called from IRQ_HANDLER)
 ;
-; Two creepers (see PROCESS_CREEPER_C76) chained together. The first uses:
+; Two creepers (see PROCESS_CREEPER_C76). The first uses:
 ;   - table source [$c72]
 ;   - output value [$c73]
 ;   - sequence index at $005d
@@ -1841,6 +1899,7 @@ F6D5: 3A       abx                           ; ..so add the index twice
 F6D6: EE 00    ldx  $00,x                    ; Load the 16-bit table entry into X
 
 ; We now have a creeper table base pointer in X
+;
 F6D8: F6 00 5F ldb  $005F                    ; Retrieve current sequence index
 F6DB: 3A       abx                           ; Add it to table base
 F6DC: A6 00    lda  $00,x                    ; Fetch sequence value into A 
@@ -2395,6 +2454,7 @@ F8B1: 83 00 01 subd #$0001                   ; Decrement the count
 F8B4: 26 11    bne  $F8C7                    ; Skip the below if nonzero
 
 ; Report that clock's finished
+;
 F8B6: CE 0C 7A ldx  #$0C7A                   ; Point X to clock-is-active flag
 F8B9: C6 00    ldb  #$00                     ; Flag will be cleared
 F8BB: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
@@ -2403,6 +2463,8 @@ F8C1: C6 01    ldb  #$01                     ; ..$01 to say the clock's done
 F8C3: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
 F8C6: 39       rts  
 
+; Write the new countdown value and return
+;
 F8C7: 36       psha                          ; Stash high byte
 F8C8: CE 0C 78 ldx  #$0C78                   ; Write low byte
 F8CB: BD F1 DB jsr  $F1DB                    ; Call P_CPU_BUS_WRITE
@@ -2452,10 +2514,10 @@ F8F0: 39       rts
 ; PROCESS_EXTEND_ROTATION:
 ; (Called from IRQ_HANDLER)
 ;
-; Reads [$c7c], increments it modulo 6, and writes it back.
+; Reads [$c7c], increments it modulo 6, and writes it back
 ;
 ; Used to rotate which bubble of EXTEND you'd get if it were to appear right
-; now.
+; now
 ;
 F8F1: CE 0C 7C ldx  #$0C7C
 F8F4: BD F1 BF jsr  $F1BF                    ; Call P_CPU_BUS_READ
@@ -2471,7 +2533,7 @@ F900: 7E F1 DB jmp  $F1DB                    ; Call P_CPU_BUS_WRITE and return
 ; PROCESS_TRANSLATOR_F88:
 ; (Called from IRQ_HANDLER)
 ;
-; This is one of three 'translator's that run each frame. Their purpose is to
+; This is one of three 'translators' that run each frame. Their purpose is to
 ; look up a value in an, effectively, 1280-byte block of random data, and to
 ; write it in shared RAM at a location which is itself determined by the
 ; contents of another location in shared RAM. Here's how it works...
@@ -2484,7 +2546,7 @@ F900: 7E F1 DB jmp  $F1DB                    ; Call P_CPU_BUS_WRITE and return
 ;   - output offset ptr = $f8b
 ;   - output base       = $c88
 ;
-; If [status] is $01, then:
+; If the contents of [status] is $01, then:
 ;
 ;   - Fetch a table number from [table ptr]
 ;   - Fetch a table index from [index ptr]
@@ -2492,13 +2554,13 @@ F900: 7E F1 DB jmp  $F1DB                    ; Call P_CPU_BUS_WRITE and return
 ;   - Locate the internal table with the fetched table number
 ;   - Look up the entry in that table for the fetched index
 ;   - Write that value to [output base + fetched output offset]
-;   - Write $ff in [status]
+;   - Write $ff into [status]
 ;
 ; The fact that the looked-up value is being stored in a specifiable place
 ; rather than a fixed one suggests to me that the whole purpose is obfuscation.
 ;
-; Kicker: in a playthrough of the game, however, I never saw the main CPU write
-; to [$f88], [$f8c] or [$f90] outside of the RAM self-test, so it appears these
+; Kicker: in a playthrough of `bublbobl`, I never saw the main CPU write to
+; [$f88], [$f8c] or [$f90] outside of the RAM self-test, so it appears these
 ; were never deployed.
 ;
 
@@ -2650,7 +2712,8 @@ F9B5: FB BB    .word $FBBB                   ; TRANSLATOR_TABLE_2
 F9B7: FC BB    .word $FCBB                   ; TRANSLATOR_TABLE_3
 F9B9: FD BB    .word $FDBB                   ; TRANSLATOR_TABLE_4
 
-; TRANSLATOR_TABLE_0
+; TRANSLATOR_TABLE_0:
+;
 F9BB: 17 3A 51 .byte $17,$3A,$51
 F9BE: E0 FE C3 .byte $E0,$FE,$C3
 F9C1: 20 10 0E .byte $20,$10,$0E
@@ -2739,6 +2802,7 @@ FAB7: E6 0F B0 .byte $E6,$0F,$B0
 FABA: 23       .byte $23
 
 ; TRANSLATOR_TABLE_1:
+;
 FABB: 77 2B C9 .byte $77,$2B,$C9
 FABE: C5 70 1A .byte $C5,$70,$1A
 FAC1: E6 0F 47 .byte $E6,$0F,$47
@@ -2827,6 +2891,7 @@ FBB7: CD D5 09 .byte $CD,$D5,$09
 FBBA: C9       .byte $C9
 
 ; TRANSLATOR_TABLE_2:
+;
 FBBB: 36 02 23 .byte $36,$02,$23
 FBBE: 5E 23 56 .byte $5E,$23,$56
 FBC1: 1A 23 9F .byte $1A,$23,$9F
@@ -2914,7 +2979,8 @@ FCB4: 70 0C C9 .byte $70,$0C,$C9
 FCB7: 03 0A E6 .byte $03,$0A,$E6
 FCBA: C0       .byte $C0
 
-; TRANSLATOR_TABLE_3
+; TRANSLATOR_TABLE_3:
+;
 FCBB: C8 0A E6 .byte $C8,$0A,$E6
 FCBE: F0 D6 40 .byte $F0,$D6,$40
 FCC1: 0F 0F 0F .byte $0F,$0F,$0F
@@ -3002,7 +3068,8 @@ FDB4: FD CB B9 .byte $FD,$CB,$B9
 FDB7: CE 11 00 .byte $CE,$11,$00
 FDBA: 48       .byte $48
 
-; TRANSLATOR_TABLE_4
+; TRANSLATOR_TABLE_4:
+;
 FDBB: C9 E6 07 .byte $C9,$E6,$07
 FDBE: F6 08 DD .byte $F6,$08,$DD
 FDC1: 77 21 0A .byte $77,$21,$0A
@@ -3093,6 +3160,7 @@ FEBA: 0A       .byte $0A
 
 ;
 ; CHECK_FOR_FACTORY_TEST:
+; (Called from RESET)
 ;
 ; If the ports are showing a test pattern that would only be seen on the factory
 ; test rig, enter test mode. Otherwise, return to the normal boot sequence.
@@ -3165,8 +3233,9 @@ FF0F: 26 2C    bne  $FF3D                    ; (See routine at $fee1)
 ; FACTORY_TEST:
 ;
 ; The remaining code exercises aspects of the MCU's core functionality, as a
-; self-test. Come what may, we'll end up at HANG, but if all the tests pass, we
-; output a pattern of bits on the ports to communicate success.
+; self-test. Come what may, we'll end up at FACTORY_TEST_COMPLETE, but if all
+; the tests pass, we output a pattern of bits on the ports to communicate
+; success.
 ;
 
 ; Configure all ports for output
@@ -3252,19 +3321,19 @@ FF6B: 3A       abx                           ; Add offset to pointer
 ;
 FF6C: C6 A5    ldb  #$A5                     ; Is $a5..
 FF6E: E1 00    cmpb $00,x                    ; ..at the current byte?
-FF70: 26 6B    bne  $FFDD                    ; If not, jump to HANG
+FF70: 26 6B    bne  $FFDD                    ; If not, jump to FACTORY_TEST_COMPLETE
 FF72: 08       inx                           ; Advance to next byte
 FF73: 8C 01 00 cmpx #$0100                   ; Are we at end of RAM?
 FF76: 27 1C    beq  $FF94                    ; If so, skip to $ff94
 FF78: C6 5A    ldb  #$5A                     ; Is $5a..
 FF7A: E1 00    cmpb $00,x                    ; ..at the current byte?
-FF7C: 26 5F    bne  $FFDD                    ; If not, jump to HANG
+FF7C: 26 5F    bne  $FFDD                    ; If not, jump to FACTORY_TEST_COMPLETE
 FF7E: 08       inx                           ; Advance to next byte
 FF7F: 8C 01 00 cmpx #$0100                   ; Are we at end of RAM?
 FF82: 27 10    beq  $FF94                    ; If so, skip to $ff94
 FF84: C6 00    ldb  #$00                     ; Is $00..
 FF86: E1 00    cmpb $00,x                    ; ..at the current byte?
-FF88: 26 53    bne  $FFDD                    ; If not, jump to HANG
+FF88: 26 53    bne  $FFDD                    ; If not, jump to FACTORY_TEST_COMPLETE
 FF8A: 08       inx                           ; Advance to next byte
 FF8B: 8C 01 00 cmpx #$0100                   ; Are we at end of RAM?
 FF8E: 27 04    beq  $FF94                    ; If so, skip to $ff94
@@ -3311,9 +3380,9 @@ FFC3: 26 F7    bne  $FFBC                    ; (See routine at $f27a)
 ; ourselves
 ;
 FFC5: 4D       tsta                          ; Is sum high byte zero?
-FFC6: 26 15    bne  $FFDD                    ; If not, jump to HANG
+FFC6: 26 15    bne  $FFDD                    ; If not, jump to FACTORY_TEST_COMPLETE
 FFC8: 5D       tstb                          ; Is sum low byte zero?
-FFC9: 26 12    bne  $FFDD                    ; If not, jump to HANG
+FFC9: 26 12    bne  $FFDD                    ; If not, jump to FACTORY_TEST_COMPLETE
 
 ; Loop
 FFCB: 96 19    lda  $19                      ; Timer status register
@@ -3329,7 +3398,7 @@ FFD7: 97 03    sta  $03                      ; Port 2 data register
 FFD9: 97 07    sta  $07                      ; Port 4 data register
 FFDB: 97 06    sta  $06                      ; Port 3 data register
 
-; HANG:
+; FACTORY_TEST_COMPLETE:
 ; (Ultimate destination of all factory test execution paths)
 ;
 FFDD: 20 FE    bra  $FFDD                    ; Loop forever
